@@ -422,7 +422,9 @@
                 activeSubtitleSrc = src;
                 for (let i = 0; i < video.textTracks.length; i++) {
                     const track = video.textTracks[i];
-                    const correspondingSubtitle = subtitles.find(s => s.src === track.src);
+                    // VTT files loaded via <track> don't expose their src, so we match on label.
+                    // This is a limitation but works for this player's logic.
+                    const correspondingSubtitle = subtitles.find(s => s.label === track.label);
                     track.mode = (correspondingSubtitle && correspondingSubtitle.src === src) ? 'showing' : 'hidden';
                 }
                 subtitlesMenu.classList.add('hidden');
@@ -458,29 +460,66 @@
                 subtitleUploadInput = container.querySelector('#subtitle-upload-input');
                 
                 // --- Attach Event Listeners ---
-                playPauseBtn.onclick = togglePlayPause;
-                centerPlayBtn.onclick = togglePlayPause;
                 video.onclick = togglePlayPause;
-                rewindBtn.onclick = () => { video.currentTime -= 10; };
-                forwardBtn.onclick = () => { video.currentTime += 10; };
+                centerPlayBtn.onclick = togglePlayPause;
+                controlsOverlay.onclick = togglePlayPause;
+
+                playPauseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    togglePlayPause();
+                };
+                rewindBtn.onclick = (e) => { 
+                    e.stopPropagation();
+                    video.currentTime -= 10; 
+                };
+                forwardBtn.onclick = (e) => { 
+                    e.stopPropagation();
+                    video.currentTime += 10; 
+                };
+                
                 video.onplay = video.onpause = updatePlayButton;
                 video.ontimeupdate = updateTimeAndProgress;
                 video.onloadedmetadata = updateTimeAndProgress;
                 video.onvolumechange = updateVolumeControls;
+
+                progressBar.addEventListener('click', e => e.stopPropagation());
                 progressBar.oninput = (e) => {
                     const newTime = e.target.value * video.duration;
                     video.currentTime = newTime;
                     const progressPercent = (e.target.value || 0) * 100;
                     progressBar.style.setProperty('--progress-percent', `${progressPercent}%`);
                 };
+                
+                volumeBar.addEventListener('click', e => e.stopPropagation());
                 volumeBar.oninput = (e) => {
                     video.volume = e.target.value;
                     video.muted = e.target.value == 0;
                     const volumePercent = e.target.value * 100;
                     volumeBar.style.setProperty('--volume-percent', `${volumePercent}%`);
                 };
-                muteBtn.onclick = toggleMute;
-                fullscreenBtn.onclick = toggleFullScreen;
+
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleMute();
+                };
+                fullscreenBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleFullScreen();
+                };
+                settingsBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    settingsMenu.classList.toggle('hidden');
+                    subtitlesMenu.classList.add('hidden');
+                };
+                subtitlesBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    subtitlesMenu.classList.toggle('hidden');
+                    settingsMenu.classList.add('hidden');
+                };
+
+                settingsMenu.addEventListener('click', e => e.stopPropagation());
+                subtitlesMenu.addEventListener('click', e => e.stopPropagation());
+
                 document.onfullscreenchange = updateFullscreenButton;
                 playerContainer.onmousemove = resetControlsTimeout;
                 playerContainer.onmouseleave = () => {
@@ -488,14 +527,7 @@
                     hideControls();
                 };
                 playerContainer.onmouseenter = resetControlsTimeout;
-                settingsBtn.onclick = () => {
-                    settingsMenu.classList.toggle('hidden');
-                    subtitlesMenu.classList.add('hidden');
-                };
-                subtitlesBtn.onclick = () => {
-                    subtitlesMenu.classList.toggle('hidden');
-                    settingsMenu.classList.add('hidden');
-                };
+
                 subtitleUploadInput.onchange = (e) => {
                     const file = e.target.files?.[0];
                     if (file && (file.name.endsWith('.srt') || file.name.endsWith('.vtt'))) {
