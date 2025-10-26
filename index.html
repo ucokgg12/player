@@ -111,14 +111,35 @@
 
             <div class="bg-slate-800 rounded-lg p-4 sm:p-6 mt-8 shadow-lg">
                 <h2 class="text-2xl font-bold text-cyan-400 mb-4">Generate Embed Code</h2>
-                <p class="text-slate-400 mb-4">Copy and paste this code into your HTML to embed the configured video player. Note: Subtitles uploaded from local files will not be included.</p>
-                <div class="relative">
-                    <textarea id="embed-code-textarea" readOnly placeholder="Load a video to generate embed code..." class="w-full h-24 bg-slate-900 text-slate-300 font-mono text-sm p-3 rounded-md border border-slate-600 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500" aria-label="Embed code"></textarea>
-                    <button id="copy-embed-btn" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white py-1 px-3 rounded-md text-sm transition-colors" title="Copy to clipboard">
-                        Copy
-                    </button>
+                <p class="text-slate-400 mb-4">Use the Iframe for embedding on websites, or share the Direct Link for a fullscreen player.</p>
+
+                <!-- Tabs -->
+                <div class="flex border-b border-slate-600 mb-4">
+                    <button id="iframe-tab-btn" class="py-2 px-4 border-b-2 transition-colors">Iframe Embed</button>
+                    <button id="direct-link-tab-btn" class="py-2 px-4 border-b-2 transition-colors">Direct Link</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div id="iframe-tab-content">
+                    <p class="text-sm text-slate-400 mb-2">Copy and paste this code into your HTML. Note: Local subtitles won't be included.</p>
+                    <div class="relative">
+                        <textarea id="embed-code-textarea" readOnly placeholder="Load a video to generate embed code..." class="w-full h-24 bg-slate-900 text-slate-300 font-mono text-sm p-3 rounded-md border border-slate-600 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500" aria-label="Embed code"></textarea>
+                        <button id="copy-embed-btn" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white py-1 px-3 rounded-md text-sm transition-colors" title="Copy to clipboard">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+                <div id="direct-link-tab-content" class="hidden">
+                    <p class="text-sm text-slate-400 mb-2">Share this link directly with others.</p>
+                    <div class="relative">
+                        <textarea id="direct-link-textarea" readOnly placeholder="Load a video to generate a direct link..." class="w-full h-24 bg-slate-900 text-slate-300 font-mono text-sm p-3 rounded-md border border-slate-600 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500" aria-label="Direct link"></textarea>
+                        <button id="copy-direct-link-btn" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white py-1 px-3 rounded-md text-sm transition-colors" title="Copy to clipboard">
+                            Copy
+                        </button>
+                    </div>
                 </div>
             </div>
+
 
             <footer class="text-center mt-8 text-slate-500 text-sm">
                 <p>Built with Vanilla JS, HTML, and Tailwind CSS.</p>
@@ -150,9 +171,17 @@
             const addResourceForm = document.getElementById('add-resource-form');
             const resourceTypeSelect = document.getElementById('resource-type-select');
             const langInput = addResourceForm.querySelector('input[name="lang"]');
+            const playerWrapper = document.getElementById('player-wrapper');
+            // Embed Code Section
             const embedCodeTextarea = document.getElementById('embed-code-textarea');
             const copyEmbedBtn = document.getElementById('copy-embed-btn');
-            const playerWrapper = document.getElementById('player-wrapper');
+            const directLinkTextarea = document.getElementById('direct-link-textarea');
+            const copyDirectLinkBtn = document.getElementById('copy-direct-link-btn');
+            const iframeTabBtn = document.getElementById('iframe-tab-btn');
+            const directLinkTabBtn = document.getElementById('direct-link-tab-btn');
+            const iframeTabContent = document.getElementById('iframe-tab-content');
+            const directLinkTabContent = document.getElementById('direct-link-tab-content');
+
 
             // --- PLAYER DOM ELEMENT REFERENCES (will be populated by setupPlayer) ---
             let playerContainer, video, controlsOverlay, centerPlayBtn, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn;
@@ -172,7 +201,7 @@
                             <input id="progress-bar" type="range" min="0" max="1" step="0.001" value="0" class="w-full h-1.5 rounded-full appearance-none cursor-pointer progress-bar" />
                             <div class="flex items-center justify-between mt-2">
                                 <div class="flex items-center gap-2 sm:gap-4">
-                                    <button id="rewind-btn" title="Rewind 10s">
+                                    <button id="rewind-btn" title="Rewind 10s" class="hidden sm:block">
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M12.5 8C9.85 8 7.45 9.12 5.6 10.6L2 7V16H11L7.38 12.38C8.77 11.22 10.54 10.5 12.5 10.5C16.04 10.5 19.05 12.81 20.1 16L22.47 15.22C20.9 10.98 17.07 8 12.5 8Z"/>
                                             <text x="12" y="13.5" font-size="5" font-family="sans-serif" fill="currentColor" text-anchor="middle" font-weight="bold">10</text>
@@ -182,7 +211,7 @@
                                         <svg id="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
                                         <svg id="pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" /></svg>
                                     </button>
-                                    <button id="forward-btn" title="Forward 10s">
+                                    <button id="forward-btn" title="Forward 10s" class="hidden sm:block">
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M11.5 8C14.15 8 16.55 9.12 18.4 10.6L22 7V16H13L16.62 12.38C15.23 11.22 13.46 10.5 11.5 10.5C7.96 10.5 4.95 12.81 3.9 16L1.53 15.22C3.1 10.98 6.93 8 11.5 8Z"/>
                                             <text x="12" y="13.5" font-size="5" font-family="sans-serif" fill="currentColor" text-anchor="middle" font-weight="bold">10</text>
@@ -193,9 +222,9 @@
                                             <svg id="volume-high-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.54 8.71 14 7.97V16.02C15.54 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12C19 15.17 16.89 17.84 14 18.7V20.77C18.01 19.86 21 16.28 21 12C21 7.72 18.01 4.14 14 3.23Z" /></svg>
                                             <svg id="volume-mute-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M16.5 12C16.5 10.23 15.54 8.71 14 7.97V10.18L16.45 12.63C16.48 12.43 16.5 12.21 16.5 12ZM19 12C19 12.94 18.8 13.82 18.46 14.64L19.97 16.15C20.62 14.91 21 13.5 21 12C21 7.72 18.01 4.14 14 3.23V5.29C16.89 6.15 19 8.83 19 12ZM4.27 3L3 4.27L7.73 9H3V15H7L12 20V13.27L16.25 17.52C15.58 17.84 14.83 18.09 14 18.22V20.77C15.38 20.45 16.63 19.82 17.68 18.96L19.73 21L21 19.73L4.27 3ZM12 4L9.91 6.09L12 8.18V4Z" /></svg>
                                         </button>
-                                        <input id="volume-bar" type="range" min="0" max="1" step="0.01" value="1" class="w-20 h-1.5 rounded-full appearance-none cursor-pointer volume-bar" />
+                                        <input id="volume-bar" type="range" min="0" max="1" step="0.01" value="1" class="w-20 h-1.5 rounded-full appearance-none cursor-pointer volume-bar hidden sm:block" />
                                     </div>
-                                    <span id="time-display" class="text-sm font-mono">00:00 / 00:00</span>
+                                    <span id="time-display" class="text-xs sm:text-sm font-mono whitespace-nowrap">00:00 / 00:00</span>
                                 </div>
                                 <div class="flex items-center gap-2 sm:gap-4">
                                     <div class="relative">
@@ -469,54 +498,28 @@
             };
 
             const handleDownload = async (e) => {
-                e.stopPropagation();
                 const sourceUrl = video.src;
 
                 if (!sourceUrl || sourceUrl.startsWith('blob:')) {
                     alert('Cannot download this video source.');
                     return;
                 }
-
-                const originalTitle = downloadBtn.title;
-                const originalIcon = downloadBtn.innerHTML;
-                downloadBtn.disabled = true;
-                downloadBtn.title = 'Preparing download...';
                 
-                const spinnerIcon = `<svg class="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>`;
-                downloadBtn.innerHTML = spinnerIcon;
+                // Create a temporary anchor element
+                const link = document.createElement('a');
+                link.href = sourceUrl;
                 
-                try {
-                    const response = await fetch(sourceUrl);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const blob = await response.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = sourceUrl.split('/').pop() || 'video.mp4';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(blobUrl);
-
-                } catch (error) {
-                    console.error('Direct download failed:', error);
-                    alert('Could not download the video directly due to browser security (CORS) restrictions. Trying to open the file in a new tab instead.');
-                    // Fallback to opening in a new tab
-                    window.open(sourceUrl, '_blank');
-                } finally {
-                    // Restore button state after a short delay to ensure the download has started
-                    setTimeout(() => {
-                        downloadBtn.disabled = false;
-                        downloadBtn.title = originalTitle;
-                        downloadBtn.innerHTML = originalIcon;
-                    }, 500);
-                }
+                // Use the download attribute to suggest a filename.
+                // Browsers will ignore this for cross-origin requests without specific headers,
+                // which is the desired fallback behavior (opening in a new tab).
+                link.download = sourceUrl.split('/').pop() || 'video.mp4';
+                
+                // Set target to _blank as a fallback for when 'download' is not honored.
+                link.target = '_blank';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             };
             
             const handleSubtitleChange = (src, forceUpdate = false) => {
@@ -669,6 +672,7 @@
                 const embeddableSubtitles = subtitles.filter(sub => !sub.src.startsWith('blob:'));
                 if (sources.length === 0 || !sources[0].src) {
                     embedCodeTextarea.value = '';
+                    directLinkTextarea.value = '';
                     return;
                 }
                 const baseUrl = window.location.origin + window.location.pathname;
@@ -679,7 +683,9 @@
                     params.set('subtitles', JSON.stringify(embeddableSubtitles));
                 }
                 const embedUrl = `${baseUrl}?${params.toString()}`;
+                
                 embedCodeTextarea.value = `<iframe src="${embedUrl}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+                directLinkTextarea.value = embedUrl;
             };
 
             const loadPrimaryVideo = () => {
@@ -697,6 +703,31 @@
                 renderSettingsMenu();
                 renderSubtitlesMenu();
                 generateEmbedCode();
+            };
+
+            const setActiveTab = (tab) => {
+                const activeClasses = ['text-cyan-400', 'border-cyan-400', 'font-semibold'];
+                const inactiveClasses = ['text-slate-400', 'hover:text-white', 'border-transparent'];
+                
+                if (tab === 'iframe') {
+                    iframeTabContent.classList.remove('hidden');
+                    directLinkTabContent.classList.add('hidden');
+                    
+                    iframeTabBtn.classList.add(...activeClasses);
+                    iframeTabBtn.classList.remove(...inactiveClasses);
+                    
+                    directLinkTabBtn.classList.add(...inactiveClasses);
+                    directLinkTabBtn.classList.remove(...activeClasses);
+                } else { // 'direct'
+                    directLinkTabContent.classList.remove('hidden');
+                    iframeTabContent.classList.add('hidden');
+
+                    directLinkTabBtn.classList.add(...activeClasses);
+                    directLinkTabBtn.classList.remove(...inactiveClasses);
+
+                    iframeTabBtn.classList.add(...inactiveClasses);
+                    iframeTabBtn.classList.remove(...activeClasses);
+                }
             };
             
             // --- INITIALIZATION ---
@@ -777,6 +808,23 @@
                             alert('Failed to copy embed code.');
                         });
                     };
+                    copyDirectLinkBtn.onclick = () => {
+                        if (!directLinkTextarea.value) {
+                            alert("Load a video first to generate a direct link.");
+                            return;
+                        }
+                        navigator.clipboard.writeText(directLinkTextarea.value).then(() => {
+                            alert('Direct link copied to clipboard!');
+                        }, (err) => {
+                            alert('Failed to copy direct link.');
+                        });
+                    };
+
+                    // Tab logic
+                    iframeTabBtn.onclick = () => setActiveTab('iframe');
+                    directLinkTabBtn.onclick = () => setActiveTab('direct');
+                    setActiveTab('iframe'); // Set initial state
+
 
                     // Set initial state for app mode
                     sources = [];
