@@ -28,10 +28,10 @@
 
         /* Progress Bar Track */
         .progress-bar::-webkit-slider-runnable-track {
-             background: linear-gradient(to right, #a3e635 var(--progress-percent, 0%), rgba(100, 116, 139, 0.5) var(--progress-percent, 0%));
+             background: linear-gradient(to right, #22c55e var(--progress-percent, 0%), rgba(100, 116, 139, 0.5) var(--progress-percent, 0%));
         }
         .progress-bar::-moz-range-track {
-             background: linear-gradient(to right, #a3e635 var(--progress-percent, 0%), rgba(100, 116, 139, 0.5) var(--progress-percent, 0%));
+             background: linear-gradient(to right, #22c55e var(--progress-percent, 0%), rgba(100, 116, 139, 0.5) var(--progress-percent, 0%));
         }
         
         /* Volume Bar Track */
@@ -192,7 +192,7 @@
                 <div id="player-container" class="relative w-full h-full bg-black group">
                     <video id="video-player" class="w-full h-full" crossOrigin="anonymous"></video>
                     
-                    <button id="center-play-btn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 text-lime-400 rounded-full bg-black/50 flex items-center justify-center transition-all duration-200 opacity-100 hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-lime-400 z-10 scale-100 hover:scale-110">
+                    <button id="center-play-btn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 text-green-500 rounded-full bg-black/50 flex items-center justify-center transition-all duration-200 opacity-100 hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-green-500 z-10 scale-100 hover:scale-110">
                         <svg class="w-10 h-10 sm:w-12 sm:h-12 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
                     </button>
 
@@ -774,7 +774,7 @@
                     iframeTabContent.classList.add('hidden');
 
                     directLinkTabBtn.classList.add(...activeClasses);
-                    directLinkTabBtn.classList.remove(...inactiveClasses);
+                    directLinkTabBtn.classList.remove(...activeClasses);
 
                     iframeTabBtn.classList.add(...inactiveClasses);
                     iframeTabBtn.classList.remove(...activeClasses);
