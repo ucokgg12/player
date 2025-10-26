@@ -1,0 +1,5 @@
+{
+  "name": "Standalone Video Player Generator",
+  "description": "A self-contained HTML/JS/CSS application that functions as a feature-rich video player and embed code generator. Users can input video URLs, add multiple resolutions and subtitles, and generate an iframe embed code for use in other websites. The player features a modern, intuitive interface.",
+  "requestFramePermissions": []
+}
