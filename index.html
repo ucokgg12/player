@@ -308,37 +308,68 @@
                 fullscreenExitIcon.classList.toggle('hidden', !isFullscreen);
             };
 
-            const renderQualityMenu = () => {
+            const renderSettingsMenu = () => {
                 settingsMenu.innerHTML = '';
-                if (sources.length <= 1) {
-                    settingsBtn.classList.add('hidden');
-                    return;
-                }
-                settingsBtn.classList.remove('hidden');
-                
-                const header = document.createElement('p');
-                header.className = 'text-sm text-slate-400 px-2 pb-1';
-                header.textContent = 'Quality';
-                settingsMenu.appendChild(header);
+                let hasQualityOptions = sources.length > 1;
 
-                sources.forEach(source => {
+                // --- Quality Section ---
+                if (hasQualityOptions) {
+                    const header = document.createElement('p');
+                    header.className = 'text-sm text-slate-400 px-2 pb-1';
+                    header.textContent = 'Quality';
+                    settingsMenu.appendChild(header);
+
+                    sources.forEach(source => {
+                        const button = document.createElement('button');
+                        button.className = 'w-full text-left px-2 py-1 rounded hover:bg-slate-700';
+                        button.textContent = source.label;
+                        if (video.src === source.src || (hls && hls.url === source.src)) {
+                            button.classList.add('text-cyan-400', 'font-bold');
+                        }
+                        button.onclick = () => {
+                            const currentTime = video.currentTime;
+                            const wasPlaying = !video.paused;
+                            loadSource(source.src);
+                            video.currentTime = currentTime;
+                            if (wasPlaying) video.play();
+                            renderSettingsMenu();
+                            settingsMenu.classList.add('hidden');
+                        };
+                        settingsMenu.appendChild(button);
+                    });
+                }
+
+                // --- Separator ---
+                if (hasQualityOptions) {
+                    const hr = document.createElement('hr');
+                    hr.className = 'w-full border-slate-600 my-1';
+                    settingsMenu.appendChild(hr);
+                }
+                
+                // --- Playback Speed Section ---
+                const speedHeader = document.createElement('p');
+                speedHeader.className = 'text-sm text-slate-400 px-2 pb-1';
+                speedHeader.textContent = 'Speed';
+                settingsMenu.appendChild(speedHeader);
+
+                const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
+                playbackRates.forEach(rate => {
                     const button = document.createElement('button');
                     button.className = 'w-full text-left px-2 py-1 rounded hover:bg-slate-700';
-                    button.textContent = source.label;
-                    if (video.src === source.src || (hls && hls.url === source.src)) {
+                    button.textContent = rate === 1 ? 'Normal' : `${rate}x`;
+                    if (Math.abs(video.playbackRate - rate) < 0.01) {
                         button.classList.add('text-cyan-400', 'font-bold');
                     }
                     button.onclick = () => {
-                        const currentTime = video.currentTime;
-                        const wasPlaying = !video.paused;
-                        loadSource(source.src);
-                        video.currentTime = currentTime;
-                        if (wasPlaying) video.play();
-                        renderQualityMenu(); // Re-render to update active state
+                        video.playbackRate = rate;
+                        renderSettingsMenu();
                         settingsMenu.classList.add('hidden');
                     };
                     settingsMenu.appendChild(button);
                 });
+
+                // Since speed control is always available, the settings button should always be visible.
+                settingsBtn.classList.remove('hidden');
             };
             
             const renderSubtitlesMenu = () => {
@@ -550,7 +581,7 @@
                     loadSource(sources[0].src);
                 }
                 updateVideoTracks();
-                renderQualityMenu();
+                renderSettingsMenu();
                 renderSubtitlesMenu();
                 updateVolumeControls();
                 updatePlayButton();
@@ -586,7 +617,7 @@
 
                 loadSource(url);
                 updateVideoTracks();
-                renderQualityMenu();
+                renderSettingsMenu();
                 renderSubtitlesMenu();
                 generateEmbedCode();
             };
@@ -595,6 +626,22 @@
             function init() {
                 const params = new URLSearchParams(window.location.search);
                 isEmbedMode = params.get('embed') === 'true';
+
+                // Add keyboard listener for spacebar play/pause
+                document.addEventListener('keydown', (e) => {
+                    // Make sure video element exists before doing anything
+                    if (!video) return;
+
+                    const activeEl = document.activeElement;
+                    const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+                    if (isTyping) return;
+
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        togglePlayPause();
+                        resetControlsTimeout(); // Show controls to give feedback
+                    }
+                });
 
                 if (isEmbedMode) {
                     appContainer.classList.add('hidden');
@@ -626,7 +673,7 @@
 
                         if (type === 'resolution') {
                             sources.push({ label, src: url });
-                            renderQualityMenu();
+                            renderSettingsMenu();
                         } else {
                             const lang = formData.get('lang');
                             if (!lang) {
