@@ -83,7 +83,7 @@
 
             <div class="bg-slate-800 rounded-lg p-4 sm:p-6 mb-8 shadow-lg space-y-4">
                 <div class="flex flex-col sm:flex-row gap-4">
-                    <input id="video-url-input" type="url" value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" placeholder="Enter video URL (MP4, M3U8, etc.)" class="flex-grow bg-slate-700 text-white placeholder-slate-400 rounded-md px-4 py-2 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition" />
+                    <input id="video-url-input" type="url" placeholder="Enter video URL (MP4, M3U8, etc.)" class="flex-grow bg-slate-700 text-white placeholder-slate-400 rounded-md px-4 py-2 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition" />
                     <button id="load-video-btn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-md transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-75">
                         Load Video
                     </button>
@@ -155,7 +155,7 @@
             const playerWrapper = document.getElementById('player-wrapper');
 
             // --- PLAYER DOM ELEMENT REFERENCES (will be populated by setupPlayer) ---
-            let playerContainer, video, controlsOverlay, centerPlayBtn, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput;
+            let playerContainer, video, controlsOverlay, centerPlayBtn, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn;
 
 
             // --- PLAYER UI TEMPLATE ---
@@ -211,6 +211,9 @@
                                         </button>
                                         <div id="settings-menu" class="absolute bottom-full right-0 mb-2 bg-slate-800/90 rounded-md p-2 min-w-[120px] hidden"></div>
                                     </div>
+                                    <button id="download-btn" title="Download">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20H19V18H5V20ZM19 9H15V3H9V9H5L12 16L19 9Z"/></svg>
+                                    </button>
                                     <button id="fullscreen-btn" title="Fullscreen">
                                         <svg id="fullscreen-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5V19H10V17H7V14ZM5 10H7V5H10V3H5V10ZM17 17H14V19H19V14H17V17ZM14 3V5H17V10H19V5H14Z" /></svg>
                                         <svg id="fullscreen-exit-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M5 16H8V19H10V14H5V16ZM8 8H5V10H10V5H8V8ZM14 19H16V16H19V14H14V19ZM16 8V5H14V10H19V8H16Z" /></svg>
@@ -228,13 +231,24 @@
             const loadSource = (url) => {
                 if (hls) {
                     hls.destroy();
+                    hls = null;
                 }
-                if (Hls.isSupported() && url.includes('.m3u8')) {
+
+                const isHls = Hls.isSupported() && url && url.includes('.m3u8');
+                const isDownloadable = url && !isHls && !url.startsWith('blob:');
+
+                if (downloadBtn) {
+                    downloadBtn.classList.toggle('hidden', !isDownloadable);
+                }
+
+                if (isHls) {
                     hls = new Hls();
                     hls.loadSource(url);
                     hls.attachMedia(video);
-                } else {
+                } else if (url) {
                     video.src = url;
+                } else {
+                    video.src = '';
                 }
             };
             
@@ -424,7 +438,14 @@
             // --- Event Handlers ---
             const togglePlayPause = () => {
                 if (video.paused) {
-                    video.play();
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            // This error can be safely ignored.
+                            // It's likely "The play() request was interrupted by a call to pause()".
+                            // or an autoplay policy preventing play.
+                        });
+                    }
                 } else {
                     video.pause();
                 }
@@ -444,6 +465,57 @@
                     });
                 } else {
                     document.exitFullscreen();
+                }
+            };
+
+            const handleDownload = async (e) => {
+                e.stopPropagation();
+                const sourceUrl = video.src;
+
+                if (!sourceUrl || sourceUrl.startsWith('blob:')) {
+                    alert('Cannot download this video source.');
+                    return;
+                }
+
+                const originalTitle = downloadBtn.title;
+                const originalIcon = downloadBtn.innerHTML;
+                downloadBtn.disabled = true;
+                downloadBtn.title = 'Preparing download...';
+                
+                const spinnerIcon = `<svg class="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>`;
+                downloadBtn.innerHTML = spinnerIcon;
+                
+                try {
+                    const response = await fetch(sourceUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = sourceUrl.split('/').pop() || 'video.mp4';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(blobUrl);
+
+                } catch (error) {
+                    console.error('Direct download failed:', error);
+                    alert('Could not download the video directly due to browser security (CORS) restrictions. Trying to open the file in a new tab instead.');
+                    // Fallback to opening in a new tab
+                    window.open(sourceUrl, '_blank');
+                } finally {
+                    // Restore button state after a short delay to ensure the download has started
+                    setTimeout(() => {
+                        downloadBtn.disabled = false;
+                        downloadBtn.title = originalTitle;
+                        downloadBtn.innerHTML = originalIcon;
+                    }, 500);
                 }
             };
             
@@ -489,6 +561,7 @@
                 subtitlesBtn = container.querySelector('#subtitles-btn');
                 subtitlesMenu = container.querySelector('#subtitles-menu');
                 subtitleUploadInput = container.querySelector('#subtitle-upload-input');
+                downloadBtn = container.querySelector('#download-btn');
                 
                 // --- Attach Event Listeners ---
                 video.onclick = togglePlayPause;
@@ -536,6 +609,10 @@
                 fullscreenBtn.onclick = (e) => {
                     e.stopPropagation();
                     toggleFullScreen();
+                };
+                downloadBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    handleDownload(e);
                 };
                 settingsBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -702,12 +779,8 @@
                     };
 
                     // Set initial state for app mode
-                    sources = [
-                        { src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', label: '720p' },
-                        { src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', label: '480p' }
-                    ];
+                    sources = [];
                     subtitles = [];
-                    videoUrlInput.value = sources[0].src;
                     setupPlayer(playerWrapper, false);
                     generateEmbedCode();
                 }
