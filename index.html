@@ -240,8 +240,14 @@
                                         </button>
                                         <div id="settings-menu" class="absolute bottom-full right-0 mb-2 bg-slate-800/90 rounded-md p-2 min-w-[120px] hidden"></div>
                                     </div>
-                                    <button id="download-btn" title="Download">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20H19V18H5V20ZM19 9H15V3H9V9H5L12 16L19 9Z"/></svg>
+                                    <button id="download-btn" title="Download" class="relative">
+                                        <svg id="download-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="transition-opacity duration-200"><path d="M5 20H19V18H5V20ZM19 9H15V3H9V9H5L12 16L19 9Z"/></svg>
+                                        <div id="download-spinner" class="absolute inset-0 flex items-center justify-center transition-opacity duration-200 opacity-0 pointer-events-none">
+                                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        </div>
                                     </button>
                                     <button id="fullscreen-btn" title="Fullscreen">
                                         <svg id="fullscreen-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5V19H10V17H7V14ZM5 10H7V5H10V3H5V10ZM17 17H14V19H19V14H17V17ZM14 3V5H17V10H19V5H14Z" /></svg>
@@ -504,22 +510,67 @@
                     alert('Cannot download this video source.');
                     return;
                 }
+
+                const downloadIcon = downloadBtn.querySelector('#download-icon');
+                const downloadSpinner = downloadBtn.querySelector('#download-spinner');
                 
-                // Create a temporary anchor element
-                const link = document.createElement('a');
-                link.href = sourceUrl;
-                
-                // Use the download attribute to suggest a filename.
-                // Browsers will ignore this for cross-origin requests without specific headers,
-                // which is the desired fallback behavior (opening in a new tab).
-                link.download = sourceUrl.split('/').pop() || 'video.mp4';
-                
-                // Set target to _blank as a fallback for when 'download' is not honored.
-                link.target = '_blank';
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // Show loading state
+                downloadIcon.classList.add('opacity-0');
+                downloadSpinner.classList.remove('opacity-0', 'pointer-events-none');
+                downloadBtn.disabled = true;
+
+                try {
+                    // Fetch the video data
+                    const response = await fetch(sourceUrl);
+                    if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    
+                    // Create a temporary link to trigger the download
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    
+                    // Try to create a clean filename
+                    let filename = 'video.mp4';
+                    try {
+                        const path = new URL(sourceUrl).pathname;
+                        const lastSegment = path.substring(path.lastIndexOf('/') + 1);
+                        if (lastSegment) filename = lastSegment;
+                    } catch (_) {
+                        const popped = sourceUrl.split('/').pop();
+                        if (popped) filename = popped.split('?')[0];
+                    }
+                    
+                    link.download = filename;
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    // Clean up the blob URL and link
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+
+                } catch (error) {
+                    console.error('Download failed:', error);
+                    alert('Direct download failed. This is likely due to server restrictions (CORS policy).\n\nAs a fallback, the video link will be opened in a new tab, where you can save it manually.');
+                    
+                    // Fallback to the original method
+                    const link = document.createElement('a');
+                    link.href = sourceUrl;
+                    link.target = '_blank';
+                    link.download = sourceUrl.split('/').pop() || 'video.mp4';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                } finally {
+                    // Hide loading state
+                    downloadIcon.classList.remove('opacity-0');
+                    downloadSpinner.classList.add('opacity-0', 'pointer-events-none');
+                    downloadBtn.disabled = false;
+                }
             };
             
             const handleSubtitleChange = (src, forceUpdate = false) => {
