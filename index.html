@@ -184,7 +184,7 @@
 
 
             // --- PLAYER DOM ELEMENT REFERENCES (will be populated by setupPlayer) ---
-            let playerContainer, video, controlsOverlay, centerPlayBtn, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn;
+            let playerContainer, video, controlsOverlay, centerPlayBtn, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn, seekOverlay, seekOverlayText;
 
 
             // --- PLAYER UI TEMPLATE ---
@@ -192,6 +192,10 @@
                 <div id="player-container" class="relative w-full h-full bg-black group">
                     <video id="video-player" class="w-full h-full" crossOrigin="anonymous"></video>
                     
+                    <div id="seek-overlay" class="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-3xl font-bold opacity-0 transition-opacity duration-100 pointer-events-none z-30">
+                        <span id="seek-overlay-text"></span>
+                    </div>
+
                     <button id="center-play-btn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 text-green-500 rounded-full bg-black/50 flex items-center justify-center transition-all duration-200 opacity-100 hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-green-500 z-10 scale-100 hover:scale-110">
                         <svg class="w-10 h-10 sm:w-12 sm:h-12 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
                     </button>
@@ -616,12 +620,87 @@
                 subtitlesMenu = container.querySelector('#subtitles-menu');
                 subtitleUploadInput = container.querySelector('#subtitle-upload-input');
                 downloadBtn = container.querySelector('#download-btn');
+                seekOverlay = container.querySelector('#seek-overlay');
+                seekOverlayText = container.querySelector('#seek-overlay-text');
                 
                 // --- Attach Event Listeners ---
-                video.onclick = togglePlayPause;
-                centerPlayBtn.onclick = togglePlayPause;
-                controlsOverlay.onclick = togglePlayPause;
+                // State for hold-to-seek
+                let holdTimeout = null;
+                let rewindInterval = null;
+                let originalPlaybackRate = 1;
+                let wasPlayingBeforeRewind = false;
 
+                const handleInteractionStart = (e) => {
+                    const target = e.target;
+                    // Ignore if interacting with controls buttons/inputs
+                    if (target.closest('button, input[type="range"]')) {
+                        return;
+                    }
+                    
+                    e.preventDefault();
+
+                    let isHold = false;
+                    
+                    const startX = e.type.startsWith('touch') ? e.changedTouches[0].clientX : e.clientX;
+                    const rect = playerContainer.getBoundingClientRect();
+                    const isRightSide = startX > rect.left + rect.width / 2;
+
+                    const startFastSeeking = () => {
+                        isHold = true;
+                        originalPlaybackRate = video.playbackRate;
+                        
+                        if (isRightSide) {
+                            seekOverlayText.textContent = '>> 2x';
+                            video.playbackRate = 2.0;
+                        } else { // Left side
+                            seekOverlayText.textContent = '<< 2x';
+                            wasPlayingBeforeRewind = !video.paused;
+                            if (wasPlayingBeforeRewind) video.pause();
+                            rewindInterval = setInterval(() => {
+                                video.currentTime = Math.max(0, video.currentTime - 0.2);
+                                updateTimeAndProgress(); // Update UI during rewind
+                            }, 100);
+                        }
+                        seekOverlay.classList.remove('opacity-0');
+                        resetControlsTimeout();
+                    };
+
+                    holdTimeout = setTimeout(startFastSeeking, 200);
+
+                    const onInteractionEnd = () => {
+                        playerContainer.removeEventListener('mouseup', onInteractionEnd);
+                        playerContainer.removeEventListener('touchend', onInteractionEnd);
+                        playerContainer.removeEventListener('mouseleave', onInteractionEnd);
+                        playerContainer.removeEventListener('touchcancel', onInteractionEnd);
+
+                        clearTimeout(holdTimeout);
+
+                        if (isHold) {
+                            if (rewindInterval) {
+                                clearInterval(rewindInterval);
+                                rewindInterval = null;
+                                if (wasPlayingBeforeRewind) {
+                                    video.play();
+                                }
+                            }
+                            video.playbackRate = originalPlaybackRate;
+                            seekOverlay.classList.add('opacity-0');
+                        } else {
+                            togglePlayPause();
+                        }
+                    };
+
+                    playerContainer.addEventListener('mouseup', onInteractionEnd);
+                    playerContainer.addEventListener('touchend', onInteractionEnd);
+                    playerContainer.addEventListener('mouseleave', onInteractionEnd);
+                    playerContainer.addEventListener('touchcancel', onInteractionEnd);
+                };
+
+                playerContainer.addEventListener('mousedown', handleInteractionStart);
+                playerContainer.addEventListener('touchstart', handleInteractionStart, { passive: false });
+
+                centerPlayBtn.onclick = togglePlayPause;
+                
                 playPauseBtn.onclick = (e) => {
                     e.stopPropagation();
                     togglePlayPause();
@@ -774,7 +853,7 @@
                     iframeTabContent.classList.add('hidden');
 
                     directLinkTabBtn.classList.add(...activeClasses);
-                    directLinkTabBtn.classList.remove(...activeClasses);
+                    directLinkTabBtn.classList.remove(...inactiveClasses);
 
                     iframeTabBtn.classList.add(...inactiveClasses);
                     iframeTabBtn.classList.remove(...activeClasses);
@@ -786,19 +865,33 @@
                 const params = new URLSearchParams(window.location.search);
                 isEmbedMode = params.get('embed') === 'true';
 
-                // Add keyboard listener for spacebar play/pause
+                // Add keyboard listener for player controls
                 document.addEventListener('keydown', (e) => {
                     // Make sure video element exists before doing anything
                     if (!video) return;
 
                     const activeEl = document.activeElement;
                     const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+                    // Don't interfere when user is typing
                     if (isTyping) return;
 
-                    if (e.code === 'Space') {
-                        e.preventDefault();
-                        togglePlayPause();
-                        resetControlsTimeout(); // Show controls to give feedback
+                    // Player hotkeys
+                    switch (e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            togglePlayPause();
+                            resetControlsTimeout(); // Show controls to give feedback
+                            break;
+                        case 'ArrowRight':
+                            e.preventDefault();
+                            video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                            resetControlsTimeout();
+                            break;
+                        case 'ArrowLeft':
+                            e.preventDefault();
+                            video.currentTime = Math.max(0, video.currentTime - 10);
+                            resetControlsTimeout();
+                            break;
                     }
                 });
 
