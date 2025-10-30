@@ -303,14 +303,24 @@
                 if (!controlsOverlay) return;
                 controlsOverlay.classList.remove('opacity-0', 'pointer-events-none');
                 controlsOverlay.classList.add('opacity-100');
+                // When controls are shown, always hide the center play button to avoid redundancy.
+                if (centerPlayBtn) {
+                    centerPlayBtn.classList.add('opacity-0', 'scale-75', 'pointer-events-none');
+                    centerPlayBtn.classList.remove('opacity-100', 'scale-100');
+                }
             };
 
             const hideControls = () => {
-                if (!controlsOverlay || video.paused) return;
+                if (!controlsOverlay) return;
                 controlsOverlay.classList.add('opacity-0', 'pointer-events-none');
                 controlsOverlay.classList.remove('opacity-100');
                 settingsMenu.classList.add('hidden');
                 subtitlesMenu.classList.add('hidden');
+                // If video is paused, reveal the center play button as the controls hide.
+                if (video.paused && centerPlayBtn) {
+                    centerPlayBtn.classList.remove('opacity-0', 'scale-75', 'pointer-events-none');
+                    centerPlayBtn.classList.add('opacity-100', 'scale-100');
+                }
             };
 
             const resetControlsTimeout = () => {
@@ -324,18 +334,12 @@
                 const isPaused = video.paused;
                 playIcon.classList.toggle('hidden', !isPaused);
                 pauseIcon.classList.toggle('hidden', isPaused);
-                if (centerPlayBtn) {
-                    if (isPaused) {
-                        centerPlayBtn.classList.remove('opacity-0', 'scale-75', 'pointer-events-none');
-                        centerPlayBtn.classList.add('opacity-100', 'scale-100');
-                    } else {
-                        centerPlayBtn.classList.add('opacity-0', 'scale-75', 'pointer-events-none');
-                        centerPlayBtn.classList.remove('opacity-100', 'scale-100');
-                    }
-                }
-                if (isPaused) {
-                    showControls();
-                }
+                
+                // On any state change (play or pause), we want to show the controls
+                // for a moment to give user feedback, then hide them.
+                // The hideControls function is smart enough to show the center
+                // play button if the video is paused.
+                resetControlsTimeout();
             };
 
             const updateTimeAndProgress = () => {
@@ -762,12 +766,19 @@
                 subtitlesMenu.addEventListener('click', e => e.stopPropagation());
 
                 document.onfullscreenchange = updateFullscreenButton;
-                playerContainer.onmousemove = resetControlsTimeout;
-                playerContainer.onmouseleave = () => {
-                    clearTimeout(controlsTimeout);
-                    hideControls();
-                };
-                playerContainer.onmouseenter = resetControlsTimeout;
+
+                // Differentiate between touch and mouse to avoid sticky controls on mobile
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+                if (!isTouchDevice) {
+                    // On desktop, use mouse movements to show/hide controls.
+                    playerContainer.onmousemove = resetControlsTimeout;
+                    playerContainer.onmouseleave = () => {
+                        clearTimeout(controlsTimeout);
+                        hideControls();
+                    };
+                    playerContainer.onmouseenter = resetControlsTimeout;
+                }
 
                 subtitleUploadInput.onchange = (e) => {
                     const file = e.target.files?.[0];
