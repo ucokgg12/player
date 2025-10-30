@@ -201,30 +201,30 @@
                     </button>
 
                     <div id="controls-overlay" class="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none z-20">
-                        <div class="absolute bottom-0 left-0 right-0 p-4 text-white bg-gradient-to-t from-black/70 to-transparent">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-4 text-white bg-gradient-to-t from-black/70 to-transparent">
                             <input id="progress-bar" type="range" min="0" max="1" step="0.001" value="0" class="w-full h-1.5 rounded-full appearance-none cursor-pointer progress-bar" />
                             <div class="flex items-center justify-between mt-2">
                                 <div class="flex items-center gap-2 sm:gap-4">
-                                    <button id="rewind-btn" title="Rewind 10s" class="hidden sm:block">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                    <button id="rewind-btn" title="Rewind 10s">
+                                        <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M12.5 8C9.85 8 7.45 9.12 5.6 10.6L2 7V16H11L7.38 12.38C8.77 11.22 10.54 10.5 12.5 10.5C16.04 10.5 19.05 12.81 20.1 16L22.47 15.22C20.9 10.98 17.07 8 12.5 8Z"/>
                                             <text x="12" y="13.5" font-size="5" font-family="sans-serif" fill="currentColor" text-anchor="middle" font-weight="bold">10</text>
                                         </svg>
                                     </button>
                                     <button id="play-pause-btn">
-                                        <svg id="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
-                                        <svg id="pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" /></svg>
+                                        <svg id="play-icon" class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
+                                        <svg id="pause-icon" class="hidden w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" /></svg>
                                     </button>
-                                    <button id="forward-btn" title="Forward 10s" class="hidden sm:block">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                    <button id="forward-btn" title="Forward 10s">
+                                        <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M11.5 8C14.15 8 16.55 9.12 18.4 10.6L22 7V16H13L16.62 12.38C15.23 11.22 13.46 10.5 11.5 10.5C7.96 10.5 4.95 12.81 3.9 16L1.53 15.22C3.1 10.98 6.93 8 11.5 8Z"/>
                                             <text x="12" y="13.5" font-size="5" font-family="sans-serif" fill="currentColor" text-anchor="middle" font-weight="bold">10</text>
                                         </svg>
                                     </button>
                                     <div class="flex items-center gap-2">
                                         <button id="mute-btn">
-                                            <svg id="volume-high-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.54 8.71 14 7.97V16.02C15.54 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12C19 15.17 16.89 17.84 14 18.7V20.77C18.01 19.86 21 16.28 21 12C21 7.72 18.01 4.14 14 3.23Z" /></svg>
-                                            <svg id="volume-mute-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M16.5 12C16.5 10.23 15.54 8.71 14 7.97V10.18L16.45 12.63C16.48 12.43 16.5 12.21 16.5 12ZM19 12C19 12.94 18.8 13.82 18.46 14.64L19.97 16.15C20.62 14.91 21 13.5 21 12C21 7.72 18.01 4.14 14 3.23V5.29C16.89 6.15 19 8.83 19 12ZM4.27 3L3 4.27L7.73 9H3V15H7L12 20V13.27L16.25 17.52C15.58 17.84 14.83 18.09 14 18.22V20.77C15.38 20.45 16.63 19.82 17.68 18.96L19.73 21L21 19.73L4.27 3ZM12 4L9.91 6.09L12 8.18V4Z" /></svg>
+                                            <svg id="volume-high-icon" class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.54 8.71 14 7.97V16.02C15.54 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12C19 15.17 16.89 17.84 14 18.7V20.77C18.01 19.86 21 16.28 21 12C21 7.72 18.01 4.14 14 3.23Z" /></svg>
+                                            <svg id="volume-mute-icon" class="hidden w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12C16.5 10.23 15.54 8.71 14 7.97V10.18L16.45 12.63C16.48 12.43 16.5 12.21 16.5 12ZM19 12C19 12.94 18.8 13.82 18.46 14.64L19.97 16.15C20.62 14.91 21 13.5 21 12C21 7.72 18.01 4.14 14 3.23V5.29C16.89 6.15 19 8.83 19 12ZM4.27 3L3 4.27L7.73 9H3V15H7L12 20V13.27L16.25 17.52C15.58 17.84 14.83 18.09 14 18.22V20.77C15.38 20.45 16.63 19.82 17.68 18.96L19.73 21L21 19.73L4.27 3ZM12 4L9.91 6.09L12 8.18V4Z" /></svg>
                                         </button>
                                         <input id="volume-bar" type="range" min="0" max="1" step="0.01" value="1" class="w-20 h-1.5 rounded-full appearance-none cursor-pointer volume-bar hidden sm:block" />
                                     </div>
@@ -234,18 +234,18 @@
                                     <div class="relative">
                                         <input type="file" id="subtitle-upload-input" accept=".srt,.vtt" class="hidden" />
                                         <button id="subtitles-btn" title="Subtitles">
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM4 12H8V14H4V12ZM14 18H4V16H14V18ZM20 18H16V16H20V18ZM20 14H10V12H20V14Z" /></svg>
+                                            <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM4 12H8V14H4V12ZM14 18H4V16H14V18ZM20 18H16V16H20V18ZM20 14H10V12H20V14Z" /></svg>
                                         </button>
                                         <div id="subtitles-menu" class="absolute bottom-full right-0 mb-2 bg-slate-800/90 rounded-md p-2 min-w-[150px] hidden flex-col items-start"></div>
                                     </div>
                                     <div class="relative">
                                         <button id="settings-btn" title="Settings">
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98C19.47 12.66 19.5 12.34 19.5 12C19.5 11.66 19.47 11.34 19.43 11.02L21.54 9.37C21.73 9.22 21.78 8.95 21.66 8.73L19.66 5.27C19.54 5.05 19.27 4.96 19.05 5.05L16.56 6.05C16.04 5.66 15.48 5.31 14.87 5.07L14.49 2.42C14.46 2.18 14.25 2 14 2H10C9.75 2 9.54 2.18 9.51 2.42L9.13 5.07C8.52 5.31 7.96 5.66 7.44 6.05L4.95 5.05C4.73 4.96 4.46 5.05 4.34 5.27L2.34 8.73C2.21 8.95 2.27 9.22 2.46 9.37L4.57 11.02C4.53 11.34 4.5 11.66 4.5 12C4.5 12.34 4.53 12.66 4.57 12.98L2.46 14.63C2.27 14.78 2.21 15.05 2.34 15.27L4.34 18.73C4.46 18.95 4.73 19.04 4.95 18.95L7.44 17.94C7.96 18.34 8.52 18.69 9.13 18.93L9.51 21.58C9.54 21.82 9.75 22 10 22H14C14.25 22 14.46 21.82 14.49 21.58L14.87 18.93C15.48 18.69 16.04 18.34 16.56 17.94L19.05 18.95C19.27 19.04 19.54 18.95 19.66 18.73L21.66 15.27C21.78 15.05 21.73 14.78 21.54 14.63L19.43 12.98ZM12 15.5C10.07 15.5 8.5 13.93 8.5 12C8.5 10.07 10.07 8.5 12 8.5C13.93 8.5 15.5 10.07 15.5 12C15.5 13.93 13.93 15.5 12 15.5Z" /></svg>
+                                            <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98C19.47 12.66 19.5 12.34 19.5 12C19.5 11.66 19.47 11.34 19.43 11.02L21.54 9.37C21.73 9.22 21.78 8.95 21.66 8.73L19.66 5.27C19.54 5.05 19.27 4.96 19.05 5.05L16.56 6.05C16.04 5.66 15.48 5.31 14.87 5.07L14.49 2.42C14.46 2.18 14.25 2 14 2H10C9.75 2 9.54 2.18 9.51 2.42L9.13 5.07C8.52 5.31 7.96 5.66 7.44 6.05L4.95 5.05C4.73 4.96 4.46 5.05 4.34 5.27L2.34 8.73C2.21 8.95 2.27 9.22 2.46 9.37L4.57 11.02C4.53 11.34 4.5 11.66 4.5 12C4.5 12.34 4.53 12.66 4.57 12.98L2.46 14.63C2.27 14.78 2.21 15.05 2.34 15.27L4.34 18.73C4.46 18.95 4.73 19.04 4.95 18.95L7.44 17.94C7.96 18.34 8.52 18.69 9.13 18.93L9.51 21.58C9.54 21.82 9.75 22 10 22H14C14.25 22 14.46 21.82 14.49 21.58L14.87 18.93C15.48 18.69 16.04 18.34 16.56 17.94L19.05 18.95C19.27 19.04 19.54 18.95 19.66 18.73L21.66 15.27C21.78 15.05 21.73 14.78 21.54 14.63L19.43 12.98ZM12 15.5C10.07 15.5 8.5 13.93 8.5 12C8.5 10.07 10.07 8.5 12 8.5C13.93 8.5 15.5 10.07 15.5 12C15.5 13.93 13.93 15.5 12 15.5Z" /></svg>
                                         </button>
                                         <div id="settings-menu" class="absolute bottom-full right-0 mb-2 bg-slate-800/90 rounded-md p-2 min-w-[120px] hidden"></div>
                                     </div>
                                     <button id="download-btn" title="Download" class="relative">
-                                        <svg id="download-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="transition-opacity duration-200"><path d="M5 20H19V18H5V20ZM19 9H15V3H9V9H5L12 16L19 9Z"/></svg>
+                                        <svg id="download-icon" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 sm:w-6 sm:h-6 transition-opacity duration-200"><path d="M5 20H19V18H5V20ZM19 9H15V3H9V9H5L12 16L19 9Z"/></svg>
                                         <div id="download-spinner" class="absolute inset-0 flex items-center justify-center transition-opacity duration-200 opacity-0 pointer-events-none">
                                             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -254,8 +254,8 @@
                                         </div>
                                     </button>
                                     <button id="fullscreen-btn" title="Fullscreen">
-                                        <svg id="fullscreen-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5V19H10V17H7V14ZM5 10H7V5H10V3H5V10ZM17 17H14V19H19V14H17V17ZM14 3V5H17V10H19V5H14Z" /></svg>
-                                        <svg id="fullscreen-exit-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M5 16H8V19H10V14H5V16ZM8 8H5V10H10V5H8V8ZM14 19H16V16H19V14H14V19ZM16 8V5H14V10H19V8H16Z" /></svg>
+                                        <svg id="fullscreen-icon" class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5V19H10V17H7V14ZM5 10H7V5H10V3H5V10ZM17 17H14V19H19V14H17V17ZM14 3V5H17V10H19V5H14Z" /></svg>
+                                        <svg id="fullscreen-exit-icon" class="hidden w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16H8V19H10V14H5V16ZM8 8H5V10H10V5H8V8ZM14 19H16V16H19V14H14V19ZM16 8V5H14V10H19V8H16Z" /></svg>
                                     </button>
                                 </div>
                             </div>
@@ -316,7 +316,7 @@
             const resetControlsTimeout = () => {
                 clearTimeout(controlsTimeout);
                 showControls();
-                controlsTimeout = setTimeout(hideControls, 3000);
+                controlsTimeout = setTimeout(hideControls, 2000);
             };
 
             // --- DOM Update Functions ---
