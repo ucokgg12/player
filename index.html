@@ -162,6 +162,7 @@
             let controlsTimeout;
             let activeSubtitleSrc = '';
             let hls;
+            const STORAGE_KEY_PREFIX = 'video-progress-';
             
             // --- APP DOM ELEMENT REFERENCES ---
             const appContainer = document.getElementById('app-container');
@@ -744,10 +745,46 @@
                     video.currentTime += 10; 
                 };
                 
-                video.onplay = video.onpause = updatePlayButton;
-                video.ontimeupdate = updateTimeAndProgress;
-                video.onloadedmetadata = updateTimeAndProgress;
-                video.onvolumechange = updateVolumeControls;
+                video.addEventListener('play', updatePlayButton);
+                video.addEventListener('pause', updatePlayButton);
+                video.addEventListener('volumechange', updateVolumeControls);
+
+                // Load saved progress when video metadata is loaded
+                video.addEventListener('loadedmetadata', () => {
+                    updateTimeAndProgress();
+                    const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
+                    const savedTime = localStorage.getItem(storageKey);
+                    if (savedTime) {
+                        const time = parseFloat(savedTime);
+                        if (isFinite(time) && time > 0 && time < video.duration) {
+                            video.currentTime = time;
+                        }
+                    }
+                });
+
+                // Save progress periodically during playback
+                let lastSaveTimestamp = 0;
+                video.addEventListener('timeupdate', () => {
+                    updateTimeAndProgress(); // Update UI
+                    
+                    const now = Date.now();
+                    if (now - lastSaveTimestamp > 5000) { // Save every 5 seconds
+                        lastSaveTimestamp = now;
+                        const { currentTime, duration } = video;
+                        
+                        // Don't save if not playing or near the start/end
+                        if (!video.paused && isFinite(duration) && currentTime > 1 && currentTime < duration - 5) {
+                           const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
+                           localStorage.setItem(storageKey, currentTime.toString());
+                        }
+                    }
+                });
+                
+                // Clear saved progress when video finishes
+                video.addEventListener('ended', () => {
+                    const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
+                    localStorage.removeItem(storageKey);
+                });
 
                 progressBar.addEventListener('click', e => e.stopPropagation());
                 progressBar.oninput = (e) => {
