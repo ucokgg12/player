@@ -598,7 +598,7 @@
             
             const toggleFullScreen = () => {
                 if (!document.fullscreenElement) {
-                    playerContainer.requestFullscreen().catch(err => {
+                    playerContainer.requestFullscreen({ navigationUI: 'hide' }).catch(err => {
                         alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
                     });
                     if (window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
