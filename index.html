@@ -437,6 +437,42 @@
                     settingsMenu.appendChild(button);
                 });
 
+                // --- Separator ---
+                const hrAspect = document.createElement('hr');
+                hrAspect.className = 'w-full border-amber-700 my-1';
+                settingsMenu.appendChild(hrAspect);
+                
+                // --- Aspect Ratio Section ---
+                const aspectHeader = document.createElement('p');
+                aspectHeader.className = 'text-sm text-gray-400 px-2 pb-1';
+                aspectHeader.textContent = 'Screen Fit';
+                settingsMenu.appendChild(aspectHeader);
+
+                const aspectModes = [
+                    { label: 'Fit (Default)', value: 'contain' },
+                    { label: 'Fill (Crop)', value: 'cover' },
+                ];
+                const currentMode = video.classList.contains('object-cover') ? 'cover' : 'contain';
+
+                aspectModes.forEach(mode => {
+                    const button = document.createElement('button');
+                    button.className = 'w-full text-left px-2 py-1 rounded hover:bg-amber-800';
+                    button.textContent = mode.label;
+                    
+                    if (currentMode === mode.value) {
+                        button.classList.add('text-amber-400', 'font-bold');
+                    }
+                    button.onclick = () => {
+                        video.classList.remove('object-contain', 'object-cover');
+                        video.classList.add(`object-${mode.value}`);
+                        localStorage.setItem('video-aspect-ratio', mode.value);
+                        renderSettingsMenu();
+                        settingsMenu.classList.add('hidden');
+                    };
+                    settingsMenu.appendChild(button);
+                });
+
+
                 // Since speed control is always available, the settings button should always be visible.
                 settingsBtn.classList.remove('hidden');
             };
@@ -668,6 +704,17 @@
                 seekOverlay = container.querySelector('#seek-overlay');
                 seekOverlayText = container.querySelector('#seek-overlay-text');
                 downloadProgressPopup = container.querySelector('#download-progress-popup');
+                
+                // Apply saved aspect ratio preference
+                const savedAspectRatio = localStorage.getItem('video-aspect-ratio');
+                if (savedAspectRatio === 'cover') {
+                    video.classList.remove('object-contain');
+                    video.classList.add('object-cover');
+                } else {
+                    // Default is 'contain', so ensure 'cover' is removed if it's not set
+                    video.classList.remove('object-cover');
+                    video.classList.add('object-contain');
+                }
                 
                 // --- Attach Event Listeners ---
                 // State for hold-to-seek
