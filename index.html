@@ -193,7 +193,7 @@
 
 
             // --- PLAYER DOM ELEMENT REFERENCES (will be populated by setupPlayer) ---
-            let playerContainer, video, controlsOverlay, centerPlayBtn, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn, seekOverlay, seekOverlayText, downloadProgressPopup;
+            let playerContainer, video, controlsOverlay, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn, downloadProgressPopup, doubleTapRewindOverlay, doubleTapForwardOverlay;
 
 
             // --- PLAYER UI TEMPLATE ---
@@ -201,15 +201,25 @@
                 <div id="player-container" class="relative w-full h-full bg-black group">
                     <video id="video-player" class="w-full h-full object-contain" crossOrigin="anonymous"></video>
                     
-                    <div id="seek-overlay" class="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-3xl font-bold opacity-0 transition-opacity duration-100 pointer-events-none z-30">
-                        <span id="seek-overlay-text"></span>
+                    <div id="double-tap-rewind-overlay" class="absolute left-0 top-0 bottom-0 w-1/3 flex items-center justify-center pointer-events-none z-30">
+                        <div class="text-white bg-black/50 rounded-full p-3 opacity-0 transition-all duration-300 ease-in-out scale-90 -translate-x-4 flex flex-col items-center">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12.5 8C9.85 8 7.45 9.12 5.6 10.6L2 7V16H11L7.38 12.38C8.77 11.22 10.54 10.5 12.5 10.5C16.04 10.5 19.05 12.81 20.1 16L22.47 15.22C20.9 10.98 17.07 8 12.5 8Z"/>
+                            </svg>
+                            <span class="text-sm font-bold mt-1">10d</span>
+                        </div>
+                    </div>
+                    <div id="double-tap-forward-overlay" class="absolute right-0 top-0 bottom-0 w-1/3 flex items-center justify-center pointer-events-none z-30">
+                        <div class="text-white bg-black/50 rounded-full p-3 opacity-0 transition-all duration-300 ease-in-out scale-90 translate-x-4 flex flex-col items-center">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                 <path d="M11.5 8C14.15 8 16.55 9.12 18.4 10.6L22 7V16H13L16.62 12.38C15.23 11.22 13.46 10.5 11.5 10.5C7.96 10.5 4.95 12.81 3.9 16L1.53 15.22C3.1 10.98 6.93 8 11.5 8Z"/>
+                            </svg>
+                            <span class="text-sm font-bold mt-1">10d</span>
+                        </div>
                     </div>
 
-                    <button id="center-play-btn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 text-green-500 rounded-full bg-black/50 flex items-center justify-center transition-all duration-200 opacity-100 hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-green-500 z-10 scale-100 hover:scale-110">
-                        <svg class="w-10 h-10 sm:w-12 sm:h-12 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
-                    </button>
-
                     <div id="controls-overlay" class="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none z-20">
+                        <div class="absolute inset-0 bg-black/20"></div>
                         <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-4 text-white bg-gradient-to-t from-black/70 to-transparent">
                             <input id="progress-bar" type="range" min="0" max="1" step="0.001" value="0" class="w-full h-1.5 rounded-full appearance-none cursor-pointer progress-bar" />
                             <div class="flex items-center justify-between mt-2">
@@ -315,11 +325,6 @@
                 if (!controlsOverlay) return;
                 controlsOverlay.classList.remove('opacity-0', 'pointer-events-none');
                 controlsOverlay.classList.add('opacity-100');
-                // When controls are shown, always hide the center play button to avoid redundancy.
-                if (centerPlayBtn) {
-                    centerPlayBtn.classList.add('opacity-0', 'scale-75', 'pointer-events-none');
-                    centerPlayBtn.classList.remove('opacity-100', 'scale-100');
-                }
             };
 
             const hideControls = () => {
@@ -328,17 +333,45 @@
                 controlsOverlay.classList.remove('opacity-100');
                 settingsMenu.classList.add('hidden');
                 subtitlesMenu.classList.add('hidden');
-                // If video is paused, reveal the center play button as the controls hide.
-                if (video.paused && centerPlayBtn) {
-                    centerPlayBtn.classList.remove('opacity-0', 'scale-75', 'pointer-events-none');
-                    centerPlayBtn.classList.add('opacity-100', 'scale-100');
-                }
             };
 
             const resetControlsTimeout = () => {
                 clearTimeout(controlsTimeout);
                 showControls();
-                controlsTimeout = setTimeout(hideControls, 2000);
+                if (!video.paused) {
+                    controlsTimeout = setTimeout(hideControls, 3000);
+                }
+            };
+            
+            const animateDoubleTap = (direction) => {
+                const overlay = direction === 'forward' ? doubleTapForwardOverlay : doubleTapRewindOverlay;
+                const animationEl = overlay.querySelector('div');
+                
+                // Reset animation
+                animationEl.classList.remove('opacity-100', 'scale-100', '-translate-x-4', 'translate-x-4');
+                animationEl.classList.add('opacity-0', 'scale-90');
+                if (direction === 'forward') {
+                     animationEl.classList.add('translate-x-4');
+                } else {
+                     animationEl.classList.add('-translate-x-4');
+                }
+                
+                // Play animation
+                setTimeout(() => {
+                    animationEl.classList.remove('opacity-0', 'scale-90');
+                     if (direction === 'forward') {
+                         animationEl.classList.remove('translate-x-4');
+                    } else {
+                         animationEl.classList.remove('-translate-x-4');
+                    }
+                    animationEl.classList.add('opacity-100', 'scale-100');
+                }, 10); // small timeout to allow CSS to apply initial state
+
+                // Hide animation
+                setTimeout(() => {
+                    animationEl.classList.add('opacity-0');
+                    animationEl.classList.remove('opacity-100');
+                }, 600);
             };
 
             // --- DOM Update Functions ---
@@ -347,14 +380,16 @@
                 playIcon.classList.toggle('hidden', !isPaused);
                 pauseIcon.classList.toggle('hidden', isPaused);
                 
-                // On any state change (play or pause), we want to show the controls
-                // for a moment to give user feedback, then hide them.
-                // The hideControls function is smart enough to show the center
-                // play button if the video is paused.
-                resetControlsTimeout();
+                if (isPaused) {
+                   resetControlsTimeout();
+                   clearTimeout(controlsTimeout);
+                } else {
+                   resetControlsTimeout();
+                }
             };
 
             const updateTimeAndProgress = () => {
+                if (!isFinite(video.duration)) return;
                 const progress = video.currentTime / video.duration;
                 const progressPercent = (progress || 0) * 100;
                 progressBar.value = progress || 0;
@@ -533,8 +568,6 @@
                     if (playPromise !== undefined) {
                         playPromise.catch(error => {
                             // This error can be safely ignored.
-                            // It's likely "The play() request was interrupted by a call to pause()".
-                            // or an autoplay policy preventing play.
                         });
                     }
                 } else {
@@ -554,8 +587,6 @@
                     playerContainer.requestFullscreen().catch(err => {
                         alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
                     });
-                    // On mobile, try to lock orientation to landscape for a better experience.
-                    // This is a "best effort" feature and might not work on all browsers/devices.
                     if (window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
                         window.screen.orientation.lock('landscape').catch(err => {
                                 console.warn("Could not lock screen orientation:", err);
@@ -577,7 +608,6 @@
                 const downloadIcon = downloadBtn.querySelector('#download-icon');
                 const downloadSpinner = downloadBtn.querySelector('#download-spinner');
                 
-                // Show loading state
                 downloadIcon.classList.add('opacity-0');
                 downloadSpinner.classList.remove('opacity-0', 'pointer-events-none');
                 downloadProgressPopup.textContent = 'Starting...';
@@ -586,12 +616,8 @@
 
                 try {
                     const response = await fetch(sourceUrl);
-                    if (!response.ok) {
-                        throw new Error(`Server merespons dengan status: ${response.status}`);
-                    }
-                    if (!response.body) {
-                        throw new Error('Respons tidak memiliki body yang dapat dibaca.');
-                    }
+                    if (!response.ok) throw new Error(`Server merespons dengan status: ${response.status}`);
+                    if (!response.body) throw new Error('Respons tidak memiliki body yang dapat dibaca.');
                     
                     const totalLength = +response.headers.get('Content-Length');
                     const totalMB = (totalLength / 1024 / 1024).toFixed(2);
@@ -650,7 +676,6 @@
                     document.body.removeChild(link);
 
                 } finally {
-                    // Hide loading state
                     downloadIcon.classList.remove('opacity-0');
                     downloadSpinner.classList.add('opacity-0', 'pointer-events-none');
                     downloadProgressPopup.classList.add('hidden');
@@ -664,8 +689,6 @@
                 activeSubtitleSrc = src;
                 for (let i = 0; i < video.textTracks.length; i++) {
                     const track = video.textTracks[i];
-                    // VTT files loaded via <track> don't expose their src, so we match on label.
-                    // This is a limitation but works for this player's logic.
                     const correspondingSubtitle = subtitles.find(s => s.label === track.label);
                     track.mode = (correspondingSubtitle && correspondingSubtitle.src === src) ? 'showing' : 'hidden';
                 }
@@ -676,11 +699,9 @@
             function setupPlayer(container, isEmbedPlayer) {
                 container.innerHTML = createPlayerHTML(isEmbedPlayer);
 
-                // Populate top-level element variables
                 playerContainer = container.querySelector('#player-container');
                 video = container.querySelector('#video-player');
                 controlsOverlay = container.querySelector('#controls-overlay');
-                centerPlayBtn = container.querySelector('#center-play-btn');
                 playPauseBtn = container.querySelector('#play-pause-btn');
                 playIcon = container.querySelector('#play-icon');
                 pauseIcon = container.querySelector('#pause-icon');
@@ -701,99 +722,66 @@
                 subtitlesMenu = container.querySelector('#subtitles-menu');
                 subtitleUploadInput = container.querySelector('#subtitle-upload-input');
                 downloadBtn = container.querySelector('#download-btn');
-                seekOverlay = container.querySelector('#seek-overlay');
-                seekOverlayText = container.querySelector('#seek-overlay-text');
                 downloadProgressPopup = container.querySelector('#download-progress-popup');
+                doubleTapRewindOverlay = container.querySelector('#double-tap-rewind-overlay');
+                doubleTapForwardOverlay = container.querySelector('#double-tap-forward-overlay');
                 
-                // Apply saved aspect ratio preference
                 const savedAspectRatio = localStorage.getItem('video-aspect-ratio');
                 if (savedAspectRatio === 'cover') {
                     video.classList.remove('object-contain');
                     video.classList.add('object-cover');
                 } else {
-                    // Default is 'contain', so ensure 'cover' is removed if it's not set
                     video.classList.remove('object-cover');
                     video.classList.add('object-contain');
                 }
                 
                 // --- Attach Event Listeners ---
-                // State for hold-to-seek
-                let holdTimeout = null;
-                let rewindInterval = null;
-                let originalPlaybackRate = 1;
-                let wasPlayingBeforeRewind = false;
+                let lastTapTime = 0;
+                let tapTimeout = null;
 
-                const handleInteractionStart = (e) => {
-                    const target = e.target;
-                    // Ignore if interacting with controls buttons/inputs
-                    if (target.closest('button, input[type="range"]')) {
-                        return;
-                    }
-                    
+                const handlePlayerTap = (e) => {
+                    if (e.target.closest('button, input[type="range"]')) return;
                     e.preventDefault();
 
-                    let isHold = false;
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTapTime;
                     
-                    const startX = e.type.startsWith('touch') ? e.changedTouches[0].clientX : e.clientX;
-                    const rect = playerContainer.getBoundingClientRect();
-                    const isRightSide = startX > rect.left + rect.width / 2;
+                    if (tapLength < 300 && tapLength > 0) {
+                        clearTimeout(tapTimeout);
+                        lastTapTime = 0;
 
-                    const startFastSeeking = () => {
-                        isHold = true;
-                        originalPlaybackRate = video.playbackRate;
+                        const rect = playerContainer.getBoundingClientRect();
+                        const tapX = e.type.startsWith('touch') ? e.changedTouches[0].clientX : e.clientX;
+                        const isRightSide = tapX > rect.left + rect.width / 2;
                         
                         if (isRightSide) {
-                            seekOverlayText.textContent = '>> 2x';
-                            video.playbackRate = 2.0;
-                        } else { // Left side
-                            seekOverlayText.textContent = '<< 2x';
-                            wasPlayingBeforeRewind = !video.paused;
-                            if (wasPlayingBeforeRewind) video.pause();
-                            rewindInterval = setInterval(() => {
-                                video.currentTime = Math.max(0, video.currentTime - 0.2);
-                                updateTimeAndProgress(); // Update UI during rewind
-                            }, 100);
-                        }
-                        seekOverlay.classList.remove('opacity-0');
-                        resetControlsTimeout();
-                    };
-
-                    holdTimeout = setTimeout(startFastSeeking, 200);
-
-                    const onInteractionEnd = () => {
-                        playerContainer.removeEventListener('mouseup', onInteractionEnd);
-                        playerContainer.removeEventListener('touchend', onInteractionEnd);
-                        playerContainer.removeEventListener('mouseleave', onInteractionEnd);
-                        playerContainer.removeEventListener('touchcancel', onInteractionEnd);
-
-                        clearTimeout(holdTimeout);
-
-                        if (isHold) {
-                            if (rewindInterval) {
-                                clearInterval(rewindInterval);
-                                rewindInterval = null;
-                                if (wasPlayingBeforeRewind) {
-                                    video.play();
-                                }
-                            }
-                            video.playbackRate = originalPlaybackRate;
-                            seekOverlay.classList.add('opacity-0');
+                            video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                            animateDoubleTap('forward');
                         } else {
-                            togglePlayPause();
+                            video.currentTime = Math.max(0, video.currentTime - 10);
+                            animateDoubleTap('rewind');
                         }
-                    };
-
-                    playerContainer.addEventListener('mouseup', onInteractionEnd);
-                    playerContainer.addEventListener('touchend', onInteractionEnd);
-                    playerContainer.addEventListener('mouseleave', onInteractionEnd);
-                    playerContainer.addEventListener('touchcancel', onInteractionEnd);
+                        resetControlsTimeout();
+                    } else {
+                        clearTimeout(tapTimeout);
+                        tapTimeout = setTimeout(() => {
+                            if (controlsOverlay.classList.contains('opacity-0')) {
+                                resetControlsTimeout();
+                            } else {
+                                clearTimeout(controlsTimeout);
+                                hideControls();
+                            }
+                        }, 250);
+                    }
+                    lastTapTime = currentTime;
                 };
 
-                playerContainer.addEventListener('mousedown', handleInteractionStart);
-                playerContainer.addEventListener('touchstart', handleInteractionStart, { passive: false });
+                playerContainer.addEventListener('touchend', handlePlayerTap);
+                playerContainer.addEventListener('click', (e) => {
+                    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return; // Ignore clicks if touch is supported
+                    handlePlayerTap(e);
+                });
 
-                centerPlayBtn.onclick = togglePlayPause;
-                
                 playPauseBtn.onclick = (e) => {
                     e.stopPropagation();
                     togglePlayPause();
@@ -810,8 +798,6 @@
                 video.addEventListener('play', updatePlayButton);
                 video.addEventListener('pause', updatePlayButton);
                 video.addEventListener('volumechange', updateVolumeControls);
-
-                // Load saved progress when video metadata is loaded
                 video.addEventListener('loadedmetadata', () => {
                     updateTimeAndProgress();
                     const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
@@ -824,17 +810,15 @@
                     }
                 });
 
-                // Save progress periodically during playback
                 let lastSaveTimestamp = 0;
                 video.addEventListener('timeupdate', () => {
-                    updateTimeAndProgress(); // Update UI
+                    updateTimeAndProgress();
                     
                     const now = Date.now();
-                    if (now - lastSaveTimestamp > 5000) { // Save every 5 seconds
+                    if (now - lastSaveTimestamp > 5000) {
                         lastSaveTimestamp = now;
                         const { currentTime, duration } = video;
                         
-                        // Don't save if not playing or near the start/end
                         if (!video.paused && isFinite(duration) && currentTime > 1 && currentTime < duration - 5) {
                            const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
                            localStorage.setItem(storageKey, currentTime.toString());
@@ -842,7 +826,6 @@
                     }
                 });
                 
-                // Clear saved progress when video finishes
                 video.addEventListener('ended', () => {
                     const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
                     localStorage.removeItem(storageKey);
@@ -894,7 +877,6 @@
 
                 document.onfullscreenchange = () => {
                     updateFullscreenButton();
-                    // When exiting fullscreen, unlock screen orientation if it was locked.
                     if (!document.fullscreenElement) {
                         if (screen.orientation && typeof screen.orientation.unlock === 'function') {
                             screen.orientation.unlock();
@@ -902,17 +884,14 @@
                     }
                 };
 
-                // Differentiate between touch and mouse to avoid sticky controls on mobile
                 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
                 if (!isTouchDevice) {
-                    // On desktop, use mouse movements to show/hide controls.
                     playerContainer.onmousemove = resetControlsTimeout;
                     playerContainer.onmouseleave = () => {
                         clearTimeout(controlsTimeout);
-                        hideControls();
+                        if (!video.paused) hideControls();
                     };
-                    playerContainer.onmouseenter = resetControlsTimeout;
                 }
 
                 subtitleUploadInput.onchange = (e) => {
@@ -1022,7 +1001,6 @@
                         case 'Space':
                             e.preventDefault();
                             togglePlayPause();
-                            resetControlsTimeout();
                             break;
                         case 'ArrowRight':
                             e.preventDefault();
@@ -1034,6 +1012,10 @@
                             video.currentTime = Math.max(0, video.currentTime - 10);
                             resetControlsTimeout();
                             break;
+                        case 'KeyF':
+                             e.preventDefault();
+                             toggleFullScreen();
+                             break;
                     }
                 });
 
