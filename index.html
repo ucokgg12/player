@@ -207,7 +207,7 @@
 
 
             // --- PLAYER DOM ELEMENT REFERENCES (will be populated by setupPlayer) ---
-            let playerContainer, video, controlsOverlay, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn, downloadProgressPopup, doubleTapRewindOverlay, doubleTapForwardOverlay;
+            let playerContainer, video, controlsOverlay, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn, downloadProgressPopup, doubleTapRewindOverlay, doubleTapForwardOverlay, centerPlayPauseBtn, centerPlayIcon, centerPauseIcon;
 
 
             // --- PLAYER UI TEMPLATE ---
@@ -233,6 +233,12 @@
                     </div>
 
                     <div id="controls-overlay" class="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none z-20">
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <button id="center-play-pause-btn" class="bg-green-600/70 rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-white pointer-events-auto transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-green-500" aria-label="Play/Pause">
+                                <svg id="center-play-icon" class="w-8 h-8 sm:w-10 sm:h-10 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
+                                <svg id="center-pause-icon" class="hidden w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" /></svg>
+                            </button>
+                        </div>
                         <div class="absolute inset-0 bg-black/20"></div>
                         <div id="controls-bar" class="absolute bottom-0 left-0 right-0 p-2 sm:p-4 text-white bg-gradient-to-t from-black/70 to-transparent">
                             <input id="progress-bar" type="range" min="0" max="1" step="0.001" value="0" class="w-full h-1.5 rounded-full appearance-none cursor-pointer progress-bar" />
@@ -391,9 +397,13 @@
             // --- DOM Update Functions ---
             const updatePlayButton = () => {
                 const isPaused = video.paused;
+                // Control bar icons
                 playIcon.classList.toggle('hidden', !isPaused);
                 pauseIcon.classList.toggle('hidden', isPaused);
-                
+                // Center icons
+                centerPlayIcon.classList.toggle('hidden', !isPaused);
+                centerPauseIcon.classList.toggle('hidden', isPaused);
+
                 if (isPaused) {
                    resetControlsTimeout();
                    clearTimeout(controlsTimeout);
@@ -734,6 +744,9 @@
                 downloadProgressPopup = container.querySelector('#download-progress-popup');
                 doubleTapRewindOverlay = container.querySelector('#double-tap-rewind-overlay');
                 doubleTapForwardOverlay = container.querySelector('#double-tap-forward-overlay');
+                centerPlayPauseBtn = container.querySelector('#center-play-pause-btn');
+                centerPlayIcon = container.querySelector('#center-play-icon');
+                centerPauseIcon = container.querySelector('#center-pause-icon');
                 
                 const savedAspectRatio = localStorage.getItem('video-aspect-ratio');
                 if (savedAspectRatio === 'cover') {
@@ -792,6 +805,10 @@
                 });
 
                 playPauseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    togglePlayPause();
+                };
+                centerPlayPauseBtn.onclick = (e) => {
                     e.stopPropagation();
                     togglePlayPause();
                 };
