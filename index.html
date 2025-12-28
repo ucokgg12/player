@@ -14,7 +14,6 @@
 
         /* Apply safe-area insets to the controls bar so UI isn't hidden by notches/home bars */
         #player-container:fullscreen #controls-bar {
-            /* Base padding is p-2 (0.5rem) */
             padding-left: calc(0.5rem + env(safe-area-inset-left));
             padding-right: calc(0.5rem + env(safe-area-inset-right));
             padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
@@ -29,7 +28,7 @@
             }
         }
 
-        /* Custom styles untuk input range (progress & volume bars) */
+        /* Custom styles for input range (progress & volume bars) */
         input[type="range"] {
             -webkit-appearance: none;
             appearance: none;
@@ -383,7 +382,7 @@
                          animationEl.classList.remove('-translate-x-4');
                     }
                     animationEl.classList.add('opacity-100', 'scale-100');
-                }, 10); // small timeout to allow CSS to apply initial state
+                }, 10); 
 
                 // Hide animation
                 setTimeout(() => {
@@ -530,7 +529,6 @@
                 });
 
 
-                // Since speed control is always available, the settings button should always be visible.
                 settingsBtn.classList.remove('hidden');
             };
             
@@ -614,88 +612,112 @@
                 }
             };
 
+            // --- IMPROVED DOWNLOAD HANDLER ---
             const handleDownload = async (e) => {
                 const sourceUrl = video.src;
 
                 if (!sourceUrl || sourceUrl.startsWith('blob:')) {
-                    alert('Tidak dapat mengunduh sumber video ini.');
+                    alert('Tidak dapat mengunduh sumber video tipe ini (Blob/Local).');
                     return;
                 }
 
                 const downloadIcon = downloadBtn.querySelector('#download-icon');
                 const downloadSpinner = downloadBtn.querySelector('#download-spinner');
                 
+                // UI Loading State
                 downloadIcon.classList.add('opacity-0');
                 downloadSpinner.classList.remove('opacity-0', 'pointer-events-none');
-                downloadProgressPopup.textContent = 'Starting...';
+                downloadProgressPopup.textContent = 'Menyiapkan...';
                 downloadProgressPopup.classList.remove('hidden');
                 downloadBtn.disabled = true;
 
+                // Tentukan nama file
+                let filename = 'video.mp4';
                 try {
+                    const fileUrl = new URL(sourceUrl);
+                    const pathParts = fileUrl.pathname.split('/');
+                    const lastPart = pathParts[pathParts.length - 1];
+                    if (lastPart && lastPart.indexOf('.') !== -1) {
+                        filename = decodeURIComponent(lastPart);
+                    }
+                } catch (err) { console.log('Filename detection failed'); }
+
+                try {
+                    // Cek ukuran file terlebih dahulu (Head Request)
+                    // Jika file > 200MB, kita hindari fetch ke memori agar browser tidak crash
+                    const headResponse = await fetch(sourceUrl, { method: 'HEAD' }).catch(() => null);
+                    if (headResponse) {
+                        const contentLength = headResponse.headers.get('Content-Length');
+                        if (contentLength && parseInt(contentLength) > 200 * 1024 * 1024) {
+                             throw new Error("File terlalu besar untuk direct blob download (Hemat RAM).");
+                        }
+                    }
+
+                    // Mulai Download ke Memory (Blob)
                     const response = await fetch(sourceUrl);
-                    if (!response.ok) throw new Error(`Server merespons dengan status: ${response.status}`);
-                    if (!response.body) throw new Error('Respons tidak memiliki body yang dapat dibaca.');
-                    
-                    const totalLength = +response.headers.get('Content-Length');
-                    const totalMB = (totalLength / 1024 / 1024).toFixed(2);
+                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
                     
                     const reader = response.body.getReader();
+                    const totalLength = +response.headers.get('Content-Length');
                     let receivedLength = 0;
                     let chunks = [];
                     
                     while(true) {
                         const { done, value } = await reader.read();
                         if (done) break;
-                        
                         chunks.push(value);
                         receivedLength += value.length;
                         
+                        // Update Progress Bar Popup
                         if (totalLength) {
-                            const receivedMB = (receivedLength / 1024 / 1024).toFixed(2);
-                            downloadProgressPopup.textContent = `${receivedMB} MB / ${totalMB} MB`;
+                            const percent = Math.round((receivedLength / totalLength) * 100);
+                            downloadProgressPopup.textContent = `${percent}%`;
                         } else {
-                            downloadProgressPopup.textContent = `${(receivedLength / 1024 / 1024).toFixed(2)} MB`;
+                            const mb = (receivedLength / 1024 / 1024).toFixed(1);
+                            downloadProgressPopup.textContent = `${mb} MB`;
                         }
                     }
 
+                    // Buat file virtual di browser
                     const blob = new Blob(chunks);
                     const url = window.URL.createObjectURL(blob);
+                    
+                    // Trigger Download
                     const link = document.createElement('a');
                     link.href = url;
-                    
-                    let filename = 'video.mp4';
-                    try {
-                        const path = new URL(sourceUrl).pathname;
-                        const lastSegment = path.substring(path.lastIndexOf('/') + 1);
-                        if (lastSegment) filename = lastSegment;
-                    } catch (_) {
-                        const popped = sourceUrl.split('/').pop();
-                        if (popped) filename = popped.split('?')[0];
-                    }
-                    
                     link.download = filename;
                     document.body.appendChild(link);
                     link.click();
                     
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
+                    // Bersihkan memori
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
 
                 } catch (error) {
-                    console.error('Pengunduhan gagal:', error);
-                    alert('Pengunduhan langsung gagal, kemungkinan karena kebijakan keamanan server (CORS).\n\nSebagai alternatif, video akan dibuka di tab baru. Di sana, Anda bisa klik kanan pada video dan pilih "Simpan video sebagai..." untuk mengunduhnya.');
+                    console.warn('Direct download gagal, mencoba metode fallback link...', error);
                     
+                    // FALLBACK: Jika CORS memblokir atau file terlalu besar
+                    // Kita buat link langsung. Browser akan menangani sisanya 
+                    // (bisa jadi download, atau play di tab baru tergantung setting browser user)
                     const link = document.createElement('a');
                     link.href = sourceUrl;
-                    link.target = '_blank';
-                    link.download = sourceUrl.split('/').pop() || 'video.mp4';
+                    link.download = filename; // Atribut ini hanya bekerja jika same-origin
+                    link.target = '_blank';   // Buka tab baru agar video player tidak tertutup
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-
+                    
+                    // Beri notifikasi kecil bahwa kita mengalihkan ke tab baru
+                    downloadProgressPopup.textContent = 'Membuka Tab...';
                 } finally {
+                    // Reset UI
                     downloadIcon.classList.remove('opacity-0');
                     downloadSpinner.classList.add('opacity-0', 'pointer-events-none');
-                    downloadProgressPopup.classList.add('hidden');
+                    setTimeout(() => {
+                        downloadProgressPopup.classList.add('hidden');
+                    }, 2000);
                     downloadBtn.disabled = false;
                 }
             };
