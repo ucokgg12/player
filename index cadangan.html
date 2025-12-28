@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Advanced Video Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        /* Allow video to go edge-to-edge in fullscreen, removing default padding */
+        #player-container:fullscreen {
+            padding: 0 !important;
+        }
+
+        /* Apply safe-area insets to the controls bar so UI isn't hidden by notches/home bars */
+        #player-container:fullscreen #controls-bar {
+            /* Base padding is p-2 (0.5rem) */
+            padding-left: calc(0.5rem + env(safe-area-inset-left));
+            padding-right: calc(0.5rem + env(safe-area-inset-right));
+            padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+        }
+
+        /* Override for sm breakpoint where base padding is p-4 (1rem) */
+        @media (min-width: 640px) {
+            #player-container:fullscreen #controls-bar {
+                padding-left: calc(1rem + env(safe-area-inset-left));
+                padding-right: calc(1rem + env(safe-area-inset-right));
+                padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+            }
+        }
+
+        /* Custom styles untuk input range (progress & volume bars) */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        /* Generic Track */
+        input[type="range"]::-webkit-slider-runnable-track {
+            background-color: rgba(217, 119, 6, 0.3); /* amber-500/30 */
+            height: 0.375rem; /* h-1.5 */
+            border-radius: 9999px;
+        }
+        input[type="range"]::-moz-range-track {
+            background-color: rgba(217, 119, 6, 0.3);
+            height: 0.375rem;
+            border-radius: 9999px;
+        }
+
+        /* Progress Bar Track */
+        .progress-bar::-webkit-slider-runnable-track {
+             background: linear-gradient(to right, #22c55e var(--progress-percent, 0%), rgba(34, 197, 94, 0.3) var(--progress-percent, 0%));
+        }
+        .progress-bar::-moz-range-track {
+             background: linear-gradient(to right, #22c55e var(--progress-percent, 0%), rgba(34, 197, 94, 0.3) var(--progress-percent, 0%));
+        }
+        
+        /* Volume Bar Track */
+        .volume-bar::-webkit-slider-runnable-track {
+             background: linear-gradient(to right, white var(--volume-percent, 100%), rgba(100, 116, 139, 0.5) var(--volume-percent, 100%));
+        }
+        .volume-bar::-moz-range-track {
+             background: linear-gradient(to right, white var(--volume-percent, 100%), rgba(100, 116, 139, 0.5) var(--volume-percent, 100%));
+        }
+
+        /* Thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -4px; /* Vertically center */
+            height: 1rem;
+            width: 1rem;
+            background-color: white;
+            border-radius: 9999px;
+            transform: scale(0);
+            transition: transform 0.2s ease-in-out;
+        }
+        input[type="range"]:hover::-webkit-slider-thumb {
+            transform: scale(1);
+        }
+        input[type="range"]::-moz-range-thumb {
+            height: 1rem;
+            width: 1rem;
+            background-color: white;
+            border-radius: 9999px;
+            border: none;
+            transform: scale(0);
+            transition: transform 0.2s ease-in-out;
+        }
+        input[type="range"]:hover::-moz-range-thumb {
+            transform: scale(1);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 h-full text-gray-900">
+
+    <div id="app-container" class="min-h-screen bg-gray-100 text-gray-900 flex flex-col items-center p-4 sm:p-8">
+        <div class="w-full max-w-4xl">
+            <header class="mb-8 text-center">
+                <h1 class="text-3xl sm:text-4xl font-bold text-amber-800">Video Player & Embed Generator</h1>
+                <p class="text-gray-600 mt-2">Enter a video link, add sources, then generate an embeddable player.</p>
+            </header>
+
+            <div class="bg-amber-100 rounded-lg p-4 sm:p-6 mb-8 shadow-lg space-y-4">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <input id="video-url-input" type="url" placeholder="Enter video URL (MP4, M3U8, etc.)" class="flex-grow bg-white text-gray-900 placeholder-gray-400 rounded-md px-4 py-2 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 transition" />
+                    <button id="load-video-btn" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-6 rounded-md transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75">
+                        Load Video
+                    </button>
+                </div>
+                <details class="bg-amber-200/50 rounded-md">
+                    <summary class="cursor-pointer font-semibold text-amber-900 p-4">Add More Resolutions & Subtitles</summary>
+                    <form id="add-resource-form" class="p-4 border-t border-amber-300 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <select name="type" id="resource-type-select" class="bg-white rounded-md px-3 py-2 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 sm:col-span-2">
+                            <option value="resolution">Resolution</option>
+                            <option value="subtitle">Subtitle</option>
+                        </select>
+                        <input name="label" placeholder="Label (e.g., 480p or English)" required class="bg-white rounded-md px-3 py-2 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <input name="lang" placeholder="Lang Code (e.g., en)" class="bg-white rounded-md px-3 py-2 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 hidden" />
+                        <input name="url" placeholder="URL" required class="bg-white rounded-md px-3 py-2 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 sm:col-span-2" />
+                        <button type="submit" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 sm:col-span-2">
+                            Add Resource by URL
+                        </button>
+                    </form>
+                </details>
+            </div>
+
+            <div id="player-wrapper" class="w-full aspect-video rounded-lg overflow-hidden shadow-2xl shadow-amber-500/10 bg-black">
+                <!-- Video Player will be inserted here by JS -->
+            </div>
+
+            <div class="bg-amber-100 rounded-lg p-4 sm:p-6 mt-8 shadow-lg">
+                <h2 class="text-2xl font-bold text-amber-800 mb-4">Generate Embed Code</h2>
+                <p class="text-gray-600 mb-4">Use the Iframe for embedding on websites, or share the Direct Link for a fullscreen player.</p>
+
+                <!-- Tabs -->
+                <div class="flex border-b border-amber-300 mb-4">
+                    <button id="iframe-tab-btn" class="py-2 px-4 border-b-2 transition-colors">Iframe Embed</button>
+                    <button id="direct-link-tab-btn" class="py-2 px-4 border-b-2 transition-colors">Direct Link</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div id="iframe-tab-content">
+                    <p class="text-sm text-gray-500 mb-2">Copy and paste this code into your HTML. Note: Local subtitles won't be included.</p>
+                    <div class="relative">
+                        <textarea id="embed-code-textarea" readOnly placeholder="Load a video to generate embed code..." class="w-full h-24 bg-gray-50 text-gray-800 font-mono text-sm p-3 rounded-md border border-amber-300 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500" aria-label="Embed code"></textarea>
+                        <button id="copy-embed-btn" class="absolute top-2 right-2 bg-amber-200 hover:bg-amber-300 text-amber-900 py-1 px-3 rounded-md text-sm transition-colors" title="Copy to clipboard">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+                <div id="direct-link-tab-content" class="hidden">
+                    <p class="text-sm text-gray-500 mb-2">Share this link directly with others.</p>
+                    <div class="relative">
+                        <textarea id="direct-link-textarea" readOnly placeholder="Load a video to generate a direct link..." class="w-full h-24 bg-gray-50 text-gray-800 font-mono text-sm p-3 rounded-md border border-amber-300 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500" aria-label="Direct link"></textarea>
+                        <button id="copy-direct-link-btn" class="absolute top-2 right-2 bg-amber-200 hover:bg-amber-300 text-amber-900 py-1 px-3 rounded-md text-sm transition-colors" title="Copy to clipboard">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+            <footer class="text-center mt-8 text-gray-500 text-sm">
+                <p>Built with Vanilla JS, HTML, and Tailwind CSS.</p>
+                <p>Note: Cross-origin (CORS) policies may prevent some video URLs from loading.</p>
+            </footer>
+        </div>
+    </div>
+    
+    <div id="embed-container" class="w-full h-full bg-black hidden">
+        <!-- Player for embed mode will be inserted here -->
+    </div>
+
+
+    <script type="module">
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let sources = [];
+            let subtitles = [];
+            let isEmbedMode = false;
+            let controlsTimeout;
+            let activeSubtitleSrc = '';
+            let hls;
+            const STORAGE_KEY_PREFIX = 'video-progress-';
+            
+            // --- APP DOM ELEMENT REFERENCES ---
+            const appContainer = document.getElementById('app-container');
+            const embedContainer = document.getElementById('embed-container');
+            const videoUrlInput = document.getElementById('video-url-input');
+            const loadVideoBtn = document.getElementById('load-video-btn');
+            const addResourceForm = document.getElementById('add-resource-form');
+            const resourceTypeSelect = document.getElementById('resource-type-select');
+            const langInput = addResourceForm.querySelector('input[name="lang"]');
+            const playerWrapper = document.getElementById('player-wrapper');
+            // Embed Code Section
+            const embedCodeTextarea = document.getElementById('embed-code-textarea');
+            const copyEmbedBtn = document.getElementById('copy-embed-btn');
+            const directLinkTextarea = document.getElementById('direct-link-textarea');
+            const copyDirectLinkBtn = document.getElementById('copy-direct-link-btn');
+            const iframeTabBtn = document.getElementById('iframe-tab-btn');
+            const directLinkTabBtn = document.getElementById('direct-link-tab-btn');
+            const iframeTabContent = document.getElementById('iframe-tab-content');
+            const directLinkTabContent = document.getElementById('direct-link-tab-content');
+
+
+            // --- PLAYER DOM ELEMENT REFERENCES (will be populated by setupPlayer) ---
+            let playerContainer, video, controlsOverlay, playPauseBtn, playIcon, pauseIcon, rewindBtn, forwardBtn, progressBar, timeDisplay, muteBtn, volumeHighIcon, volumeMuteIcon, volumeBar, fullscreenBtn, fullscreenIcon, fullscreenExitIcon, settingsBtn, settingsMenu, subtitlesBtn, subtitlesMenu, subtitleUploadInput, downloadBtn, downloadProgressPopup, doubleTapRewindOverlay, doubleTapForwardOverlay, centerPlayPauseBtn, centerPlayIcon, centerPauseIcon;
+
+
+            // --- PLAYER UI TEMPLATE ---
+            const createPlayerHTML = (isEmbed = false) => `
+                <div id="player-container" class="relative w-full h-full bg-black group">
+                    <video id="video-player" class="w-full h-full object-contain" crossOrigin="anonymous"></video>
+                    
+                    <div id="double-tap-rewind-overlay" class="absolute left-0 top-0 bottom-0 w-1/3 flex items-center justify-center pointer-events-none z-30">
+                        <div class="text-white bg-black/50 rounded-full p-3 opacity-0 transition-all duration-300 ease-in-out scale-90 -translate-x-4 flex flex-col items-center">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12.5 8C9.85 8 7.45 9.12 5.6 10.6L2 7V16H11L7.38 12.38C8.77 11.22 10.54 10.5 12.5 10.5C16.04 10.5 19.05 12.81 20.1 16L22.47 15.22C20.9 10.98 17.07 8 12.5 8Z"/>
+                            </svg>
+                            <span class="text-sm font-bold mt-1">10d</span>
+                        </div>
+                    </div>
+                    <div id="double-tap-forward-overlay" class="absolute right-0 top-0 bottom-0 w-1/3 flex items-center justify-center pointer-events-none z-30">
+                        <div class="text-white bg-black/50 rounded-full p-3 opacity-0 transition-all duration-300 ease-in-out scale-90 translate-x-4 flex flex-col items-center">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                 <path d="M11.5 8C14.15 8 16.55 9.12 18.4 10.6L22 7V16H13L16.62 12.38C15.23 11.22 13.46 10.5 11.5 10.5C7.96 10.5 4.95 12.81 3.9 16L1.53 15.22C3.1 10.98 6.93 8 11.5 8Z"/>
+                            </svg>
+                            <span class="text-sm font-bold mt-1">10d</span>
+                        </div>
+                    </div>
+
+                    <div id="controls-overlay" class="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none z-20">
+                        <div class="absolute inset-0 bg-black/20 pointer-events-none"></div>
+                        <button id="center-play-pause-btn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-600/70 rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-white pointer-events-auto transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-green-500" aria-label="Play/Pause">
+                            <svg id="center-play-icon" class="w-8 h-8 sm:w-10 sm:h-10 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
+                            <svg id="center-pause-icon" class="hidden w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" /></svg>
+                        </button>
+                        <div id="controls-bar" class="absolute bottom-0 left-0 right-0 p-2 sm:p-4 text-white bg-gradient-to-t from-black/70 to-transparent">
+                            <input id="progress-bar" type="range" min="0" max="1" step="0.001" value="0" class="w-full h-1.5 rounded-full appearance-none cursor-pointer progress-bar" />
+                            <div class="flex items-center justify-between mt-2">
+                                <div class="flex items-center gap-2 sm:gap-4">
+                                    <button id="rewind-btn" title="Rewind 10s">
+                                        <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12.5 8C9.85 8 7.45 9.12 5.6 10.6L2 7V16H11L7.38 12.38C8.77 11.22 10.54 10.5 12.5 10.5C16.04 10.5 19.05 12.81 20.1 16L22.47 15.22C20.9 10.98 17.07 8 12.5 8Z"/>
+                                            <text x="12" y="13.5" font-size="5" font-family="sans-serif" fill="currentColor" text-anchor="middle" font-weight="bold">10</text>
+                                        </svg>
+                                    </button>
+                                    <button id="play-pause-btn">
+                                        <svg id="play-icon" class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5V19L19 12L8 5Z" /></svg>
+                                        <svg id="pause-icon" class="hidden w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19H10V5H6V19ZM14 5V19H18V5H14Z" /></svg>
+                                    </button>
+                                    <button id="forward-btn" title="Forward 10s">
+                                        <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M11.5 8C14.15 8 16.55 9.12 18.4 10.6L22 7V16H13L16.62 12.38C15.23 11.22 13.46 10.5 11.5 10.5C7.96 10.5 4.95 12.81 3.9 16L1.53 15.22C3.1 10.98 6.93 8 11.5 8Z"/>
+                                            <text x="12" y="13.5" font-size="5" font-family="sans-serif" fill="currentColor" text-anchor="middle" font-weight="bold">10</text>
+                                        </svg>
+                                    </button>
+                                    <div class="flex items-center gap-2">
+                                        <button id="mute-btn">
+                                            <svg id="volume-high-icon" class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.54 8.71 14 7.97V16.02C15.54 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12C19 15.17 16.89 17.84 14 18.7V20.77C18.01 19.86 21 16.28 21 12C21 7.72 18.01 4.14 14 3.23Z" /></svg>
+                                            <svg id="volume-mute-icon" class="hidden w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12C16.5 10.23 15.54 8.71 14 7.97V10.18L16.45 12.63C16.48 12.43 16.5 12.21 16.5 12ZM19 12C19 12.94 18.8 13.82 18.46 14.64L19.97 16.15C20.62 14.91 21 13.5 21 12C21 7.72 18.01 4.14 14 3.23V5.29C16.89 6.15 19 8.83 19 12ZM4.27 3L3 4.27L7.73 9H3V15H7L12 20V13.27L16.25 17.52C15.58 17.84 14.83 18.09 14 18.22V20.77C15.38 20.45 16.63 19.82 17.68 18.96L19.73 21L21 19.73L4.27 3ZM12 4L9.91 6.09L12 8.18V4Z" /></svg>
+                                        </button>
+                                        <input id="volume-bar" type="range" min="0" max="1" step="0.01" value="1" class="w-20 h-1.5 rounded-full appearance-none cursor-pointer volume-bar hidden sm:block" />
+                                    </div>
+                                    <span id="time-display" class="text-xs sm:text-sm font-mono whitespace-nowrap">00:00 / 00:00</span>
+                                </div>
+                                <div class="flex items-center gap-2 sm:gap-4">
+                                    <div class="relative">
+                                        <input type="file" id="subtitle-upload-input" accept=".srt,.vtt" class="hidden" />
+                                        <button id="subtitles-btn" title="Subtitles">
+                                            <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM4 12H8V14H4V12ZM14 18H4V16H14V18ZM20 18H16V16H20V18ZM20 14H10V12H20V14Z" /></svg>
+                                        </button>
+                                        <div id="subtitles-menu" class="absolute bottom-full left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:-translate-x-0 mb-2 bg-amber-900/90 rounded-md p-2 min-w-[150px] hidden flex flex-col items-start max-h-48 overflow-y-auto"></div>
+                                    </div>
+                                    <div class="relative">
+                                        <button id="settings-btn" title="Settings">
+                                            <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98C19.47 12.66 19.5 12.34 19.5 12C19.5 11.66 19.47 11.34 19.43 11.02L21.54 9.37C21.73 9.22 21.78 8.95 21.66 8.73L19.66 5.27C19.54 5.05 19.27 4.96 19.05 5.05L16.56 6.05C16.04 5.66 15.48 5.31 14.87 5.07L14.49 2.42C14.46 2.18 14.25 2 14 2H10C9.75 2 9.54 2.18 9.51 2.42L9.13 5.07C8.52 5.31 7.96 5.66 7.44 6.05L4.95 5.05C4.73 4.96 4.46 5.05 4.34 5.27L2.34 8.73C2.21 8.95 2.27 9.22 2.46 9.37L4.57 11.02C4.53 11.34 4.5 11.66 4.5 12C4.5 12.34 4.53 12.66 4.57 12.98L2.46 14.63C2.27 14.78 2.21 15.05 2.34 15.27L4.34 18.73C4.46 18.95 4.73 19.04 4.95 18.95L7.44 17.94C7.96 18.34 8.52 18.69 9.13 18.93L9.51 21.58C9.54 21.82 9.75 22 10 22H14C14.25 22 14.46 21.82 14.49 21.58L14.87 18.93C15.48 18.69 16.04 18.34 16.56 17.94L19.05 18.95C19.27 19.04 19.54 18.95 19.66 18.73L21.66 15.27C21.78 15.05 21.73 14.78 21.54 14.63L19.43 12.98ZM12 15.5C10.07 15.5 8.5 13.93 8.5 12C8.5 10.07 10.07 8.5 12 8.5C13.93 8.5 15.5 10.07 15.5 12C15.5 13.93 13.93 15.5 12 15.5Z" /></svg>
+                                        </button>
+                                        <div id="settings-menu" class="absolute bottom-full left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:-translate-x-0 mb-2 bg-amber-900/90 rounded-md p-2 min-w-[120px] hidden flex flex-col max-h-48 overflow-y-auto"></div>
+                                    </div>
+                                    <div class="relative">
+                                        <div id="download-progress-popup" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-amber-800 text-white text-xs font-mono whitespace-nowrap px-2 py-1 rounded-md shadow-lg hidden"></div>
+                                        <button id="download-btn" title="Download">
+                                            <svg id="download-icon" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 sm:w-6 sm:h-6 transition-opacity duration-200"><path d="M5 20H19V18H5V20ZM19 9H15V3H9V9H5L12 16L19 9Z"/></svg>
+                                            <div id="download-spinner" class="absolute inset-0 flex items-center justify-center transition-opacity duration-200 opacity-0 pointer-events-none">
+                                                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <button id="fullscreen-btn" title="Fullscreen">
+                                        <svg id="fullscreen-icon" class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5V19H10V17H7V14ZM5 10H7V5H10V3H5V10ZM17 17H14V19H19V14H17V17ZM14 3V5H17V10H19V5H14Z" /></svg>
+                                        <svg id="fullscreen-exit-icon" class="hidden w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16H8V19H10V14H5V16ZM8 8H5V10H10V5H8V8ZM14 19H16V16H19V14H14V19ZM16 8V5H14V10H19V8H16Z" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // --- PLAYER LOGIC ---
+
+            // --- Video Loading Logic ---
+            const loadSource = (url) => {
+                if (hls) {
+                    hls.destroy();
+                    hls = null;
+                }
+
+                const isHls = Hls.isSupported() && url && url.includes('.m3u8');
+                const isDownloadable = url && !isHls && !url.startsWith('blob:');
+
+                if (downloadBtn) {
+                    downloadBtn.parentElement.classList.toggle('hidden', !isDownloadable);
+                }
+
+                if (isHls) {
+                    hls = new Hls();
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+                } else if (url) {
+                    video.src = url;
+                } else {
+                    video.src = '';
+                }
+            };
+            
+            // --- Helper Functions ---
+            const formatTime = (timeInSeconds) => {
+                if (isNaN(timeInSeconds)) return '00:00';
+                const minutes = Math.floor(timeInSeconds / 60);
+                const seconds = Math.floor(timeInSeconds % 60);
+                return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            };
+
+            const showControls = () => {
+                if (!controlsOverlay) return;
+                controlsOverlay.classList.remove('opacity-0', 'pointer-events-none');
+                controlsOverlay.classList.add('opacity-100');
+            };
+
+            const hideControls = () => {
+                if (!controlsOverlay) return;
+                controlsOverlay.classList.add('opacity-0', 'pointer-events-none');
+                controlsOverlay.classList.remove('opacity-100');
+                settingsMenu.classList.add('hidden');
+                subtitlesMenu.classList.add('hidden');
+            };
+
+            const resetControlsTimeout = () => {
+                clearTimeout(controlsTimeout);
+                showControls();
+                if (!video.paused) {
+                    controlsTimeout = setTimeout(hideControls, 3000);
+                }
+            };
+            
+            const animateDoubleTap = (direction) => {
+                const overlay = direction === 'forward' ? doubleTapForwardOverlay : doubleTapRewindOverlay;
+                const animationEl = overlay.querySelector('div');
+                
+                // Reset animation
+                animationEl.classList.remove('opacity-100', 'scale-100', '-translate-x-4', 'translate-x-4');
+                animationEl.classList.add('opacity-0', 'scale-90');
+                if (direction === 'forward') {
+                     animationEl.classList.add('translate-x-4');
+                } else {
+                     animationEl.classList.add('-translate-x-4');
+                }
+                
+                // Play animation
+                setTimeout(() => {
+                    animationEl.classList.remove('opacity-0', 'scale-90');
+                     if (direction === 'forward') {
+                         animationEl.classList.remove('translate-x-4');
+                    } else {
+                         animationEl.classList.remove('-translate-x-4');
+                    }
+                    animationEl.classList.add('opacity-100', 'scale-100');
+                }, 10); // small timeout to allow CSS to apply initial state
+
+                // Hide animation
+                setTimeout(() => {
+                    animationEl.classList.add('opacity-0');
+                    animationEl.classList.remove('opacity-100');
+                }, 600);
+            };
+
+            // --- DOM Update Functions ---
+            const updatePlayButton = () => {
+                const isPaused = video.paused;
+                // Control bar icons
+                playIcon.classList.toggle('hidden', !isPaused);
+                pauseIcon.classList.toggle('hidden', isPaused);
+                // Center icons
+                centerPlayIcon.classList.toggle('hidden', !isPaused);
+                centerPauseIcon.classList.toggle('hidden', isPaused);
+
+                if (isPaused) {
+                   resetControlsTimeout();
+                   clearTimeout(controlsTimeout);
+                } else {
+                   resetControlsTimeout();
+                }
+            };
+
+            const updateTimeAndProgress = () => {
+                if (!isFinite(video.duration)) return;
+                const progress = video.currentTime / video.duration;
+                const progressPercent = (progress || 0) * 100;
+                progressBar.value = progress || 0;
+                progressBar.style.setProperty('--progress-percent', `${progressPercent}%`);
+                timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+            };
+
+            const updateVolumeControls = () => {
+                const isMuted = video.muted || video.volume === 0;
+                volumeBar.value = isMuted ? 0 : video.volume;
+                const volumePercent = (isMuted ? 0 : video.volume) * 100;
+                volumeBar.style.setProperty('--volume-percent', `${volumePercent}%`);
+                volumeHighIcon.classList.toggle('hidden', isMuted);
+                volumeMuteIcon.classList.toggle('hidden', !isMuted);
+            };
+            
+            const updateFullscreenButton = () => {
+                const isFullscreen = !!document.fullscreenElement;
+                fullscreenIcon.classList.toggle('hidden', isFullscreen);
+                fullscreenExitIcon.classList.toggle('hidden', !isFullscreen);
+            };
+
+            const renderSettingsMenu = () => {
+                settingsMenu.innerHTML = '';
+                let hasQualityOptions = sources.length > 1;
+
+                // --- Quality Section ---
+                if (hasQualityOptions) {
+                    const header = document.createElement('p');
+                    header.className = 'text-sm text-gray-400 px-2 pb-1';
+                    header.textContent = 'Quality';
+                    settingsMenu.appendChild(header);
+
+                    sources.forEach(source => {
+                        const button = document.createElement('button');
+                        button.className = 'w-full text-left px-2 py-1 rounded hover:bg-amber-800';
+                        button.textContent = source.label;
+                        if (video.src === source.src || (hls && hls.url === source.src)) {
+                            button.classList.add('text-amber-400', 'font-bold');
+                        }
+                        button.onclick = () => {
+                            const currentTime = video.currentTime;
+                            const wasPlaying = !video.paused;
+                            loadSource(source.src);
+                            video.currentTime = currentTime;
+                            if (wasPlaying) video.play();
+                            renderSettingsMenu();
+                            settingsMenu.classList.add('hidden');
+                        };
+                        settingsMenu.appendChild(button);
+                    });
+                }
+
+                // --- Separator ---
+                if (hasQualityOptions) {
+                    const hr = document.createElement('hr');
+                    hr.className = 'w-full border-amber-700 my-1';
+                    settingsMenu.appendChild(hr);
+                }
+                
+                // --- Playback Speed Section ---
+                const speedHeader = document.createElement('p');
+                speedHeader.className = 'text-sm text-gray-400 px-2 pb-1';
+                speedHeader.textContent = 'Speed';
+                settingsMenu.appendChild(speedHeader);
+
+                const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
+                playbackRates.forEach(rate => {
+                    const button = document.createElement('button');
+                    button.className = 'w-full text-left px-2 py-1 rounded hover:bg-amber-800';
+                    button.textContent = rate === 1 ? 'Normal' : `${rate}x`;
+                    if (Math.abs(video.playbackRate - rate) < 0.01) {
+                        button.classList.add('text-amber-400', 'font-bold');
+                    }
+                    button.onclick = () => {
+                        video.playbackRate = rate;
+                        renderSettingsMenu();
+                        settingsMenu.classList.add('hidden');
+                    };
+                    settingsMenu.appendChild(button);
+                });
+
+                // --- Separator ---
+                const hrAspect = document.createElement('hr');
+                hrAspect.className = 'w-full border-amber-700 my-1';
+                settingsMenu.appendChild(hrAspect);
+                
+                // --- Aspect Ratio Section ---
+                const aspectHeader = document.createElement('p');
+                aspectHeader.className = 'text-sm text-gray-400 px-2 pb-1';
+                aspectHeader.textContent = 'Screen Fit';
+                settingsMenu.appendChild(aspectHeader);
+
+                const aspectModes = [
+                    { label: 'Fit (Default)', value: 'contain' },
+                    { label: 'Fill (Crop)', value: 'cover' },
+                ];
+                const currentMode = video.classList.contains('object-cover') ? 'cover' : 'contain';
+
+                aspectModes.forEach(mode => {
+                    const button = document.createElement('button');
+                    button.className = 'w-full text-left px-2 py-1 rounded hover:bg-amber-800';
+                    button.textContent = mode.label;
+                    
+                    if (currentMode === mode.value) {
+                        button.classList.add('text-amber-400', 'font-bold');
+                    }
+                    button.onclick = () => {
+                        video.classList.remove('object-contain', 'object-cover');
+                        video.classList.add(`object-${mode.value}`);
+                        localStorage.setItem('video-aspect-ratio', mode.value);
+                        renderSettingsMenu();
+                        settingsMenu.classList.add('hidden');
+                    };
+                    settingsMenu.appendChild(button);
+                });
+
+
+                // Since speed control is always available, the settings button should always be visible.
+                settingsBtn.classList.remove('hidden');
+            };
+            
+            const renderSubtitlesMenu = () => {
+                subtitlesMenu.innerHTML = '';
+                
+                subtitles.forEach(sub => {
+                    const button = document.createElement('button');
+                    button.className = `w-full text-left px-2 py-1 rounded hover:bg-amber-800`;
+                    button.textContent = sub.label;
+                    if (activeSubtitleSrc === sub.src) {
+                        button.classList.add('text-amber-400', 'font-bold');
+                    }
+                    button.onclick = () => handleSubtitleChange(sub.src);
+                    subtitlesMenu.appendChild(button);
+                });
+                
+                const offButton = document.createElement('button');
+                offButton.className = `w-full text-left px-2 py-1 rounded hover:bg-amber-800 ${activeSubtitleSrc === '' ? 'text-amber-400 font-bold' : ''}`;
+                offButton.textContent = 'Off';
+                offButton.onclick = () => handleSubtitleChange('');
+                subtitlesMenu.appendChild(offButton);
+                
+                if (!isEmbedMode) {
+                    const hr = document.createElement('hr');
+                    hr.className = 'w-full border-amber-700 my-1';
+                    subtitlesMenu.appendChild(hr);
+                    
+                    const addButton = document.createElement('button');
+                    addButton.className = 'w-full text-left px-2 py-1 rounded hover:bg-amber-800';
+                    addButton.textContent = 'Add Subtitle...';
+                    addButton.onclick = () => subtitleUploadInput.click();
+                    subtitlesMenu.appendChild(addButton);
+                }
+            };
+
+            const updateVideoTracks = () => {
+                const oldTracks = video.querySelectorAll('track');
+                oldTracks.forEach(t => t.remove());
+
+                subtitles.forEach(sub => {
+                    const track = document.createElement('track');
+                    track.kind = 'subtitles';
+                    track.src = sub.src;
+                    track.srclang = sub.lang;
+                    track.label = sub.label;
+                    video.appendChild(track);
+                });
+                
+                handleSubtitleChange(activeSubtitleSrc, true);
+            };
+
+            // --- Event Handlers ---
+            const togglePlayPause = () => {
+                if (video.paused) {
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            // This error can be safely ignored.
+                        });
+                    }
+                } else {
+                    video.pause();
+                }
+            };
+
+            const toggleMute = () => {
+                video.muted = !video.muted;
+                if (!video.muted && video.volume === 0) {
+                    video.volume = 0.5;
+                }
+            };
+            
+            const toggleFullScreen = () => {
+                if (!document.fullscreenElement) {
+                    playerContainer.requestFullscreen({ navigationUI: 'hide' }).catch(err => {
+                        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            };
+
+            const handleDownload = async (e) => {
+                const sourceUrl = video.src;
+
+                if (!sourceUrl || sourceUrl.startsWith('blob:')) {
+                    alert('Tidak dapat mengunduh sumber video ini.');
+                    return;
+                }
+
+                const downloadIcon = downloadBtn.querySelector('#download-icon');
+                const downloadSpinner = downloadBtn.querySelector('#download-spinner');
+                
+                downloadIcon.classList.add('opacity-0');
+                downloadSpinner.classList.remove('opacity-0', 'pointer-events-none');
+                downloadProgressPopup.textContent = 'Starting...';
+                downloadProgressPopup.classList.remove('hidden');
+                downloadBtn.disabled = true;
+
+                try {
+                    const response = await fetch(sourceUrl);
+                    if (!response.ok) throw new Error(`Server merespons dengan status: ${response.status}`);
+                    if (!response.body) throw new Error('Respons tidak memiliki body yang dapat dibaca.');
+                    
+                    const totalLength = +response.headers.get('Content-Length');
+                    const totalMB = (totalLength / 1024 / 1024).toFixed(2);
+                    
+                    const reader = response.body.getReader();
+                    let receivedLength = 0;
+                    let chunks = [];
+                    
+                    while(true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        chunks.push(value);
+                        receivedLength += value.length;
+                        
+                        if (totalLength) {
+                            const receivedMB = (receivedLength / 1024 / 1024).toFixed(2);
+                            downloadProgressPopup.textContent = `${receivedMB} MB / ${totalMB} MB`;
+                        } else {
+                            downloadProgressPopup.textContent = `${(receivedLength / 1024 / 1024).toFixed(2)} MB`;
+                        }
+                    }
+
+                    const blob = new Blob(chunks);
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    
+                    let filename = 'video.mp4';
+                    try {
+                        const path = new URL(sourceUrl).pathname;
+                        const lastSegment = path.substring(path.lastIndexOf('/') + 1);
+                        if (lastSegment) filename = lastSegment;
+                    } catch (_) {
+                        const popped = sourceUrl.split('/').pop();
+                        if (popped) filename = popped.split('?')[0];
+                    }
+                    
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+
+                } catch (error) {
+                    console.error('Pengunduhan gagal:', error);
+                    alert('Pengunduhan langsung gagal, kemungkinan karena kebijakan keamanan server (CORS).\n\nSebagai alternatif, video akan dibuka di tab baru. Di sana, Anda bisa klik kanan pada video dan pilih "Simpan video sebagai..." untuk mengunduhnya.');
+                    
+                    const link = document.createElement('a');
+                    link.href = sourceUrl;
+                    link.target = '_blank';
+                    link.download = sourceUrl.split('/').pop() || 'video.mp4';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                } finally {
+                    downloadIcon.classList.remove('opacity-0');
+                    downloadSpinner.classList.add('opacity-0', 'pointer-events-none');
+                    downloadProgressPopup.classList.add('hidden');
+                    downloadBtn.disabled = false;
+                }
+            };
+            
+            const handleSubtitleChange = (src, forceUpdate = false) => {
+                if (activeSubtitleSrc === src && !forceUpdate) return;
+                
+                activeSubtitleSrc = src;
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    const track = video.textTracks[i];
+                    const correspondingSubtitle = subtitles.find(s => s.label === track.label);
+                    track.mode = (correspondingSubtitle && correspondingSubtitle.src === src) ? 'showing' : 'hidden';
+                }
+                subtitlesMenu.classList.add('hidden');
+                renderSubtitlesMenu();
+            };
+            
+            function setupPlayer(container, isEmbedPlayer) {
+                container.innerHTML = createPlayerHTML(isEmbedPlayer);
+
+                playerContainer = container.querySelector('#player-container');
+                video = container.querySelector('#video-player');
+                controlsOverlay = container.querySelector('#controls-overlay');
+                playPauseBtn = container.querySelector('#play-pause-btn');
+                playIcon = container.querySelector('#play-icon');
+                pauseIcon = container.querySelector('#pause-icon');
+                rewindBtn = container.querySelector('#rewind-btn');
+                forwardBtn = container.querySelector('#forward-btn');
+                progressBar = container.querySelector('#progress-bar');
+                timeDisplay = container.querySelector('#time-display');
+                muteBtn = container.querySelector('#mute-btn');
+                volumeHighIcon = container.querySelector('#volume-high-icon');
+                volumeMuteIcon = container.querySelector('#volume-mute-icon');
+                volumeBar = container.querySelector('#volume-bar');
+                fullscreenBtn = container.querySelector('#fullscreen-btn');
+                fullscreenIcon = container.querySelector('#fullscreen-icon');
+                fullscreenExitIcon = container.querySelector('#fullscreen-exit-icon');
+                settingsBtn = container.querySelector('#settings-btn');
+                settingsMenu = container.querySelector('#settings-menu');
+                subtitlesBtn = container.querySelector('#subtitles-btn');
+                subtitlesMenu = container.querySelector('#subtitles-menu');
+                subtitleUploadInput = container.querySelector('#subtitle-upload-input');
+                downloadBtn = container.querySelector('#download-btn');
+                downloadProgressPopup = container.querySelector('#download-progress-popup');
+                doubleTapRewindOverlay = container.querySelector('#double-tap-rewind-overlay');
+                doubleTapForwardOverlay = container.querySelector('#double-tap-forward-overlay');
+                centerPlayPauseBtn = container.querySelector('#center-play-pause-btn');
+                centerPlayIcon = container.querySelector('#center-play-icon');
+                centerPauseIcon = container.querySelector('#center-pause-icon');
+                
+                const savedAspectRatio = localStorage.getItem('video-aspect-ratio');
+                if (savedAspectRatio === 'cover') {
+                    video.classList.remove('object-contain');
+                    video.classList.add('object-cover');
+                } else {
+                    video.classList.remove('object-cover');
+                    video.classList.add('object-contain');
+                }
+                
+                // --- Attach Event Listeners ---
+                let lastTapTime = 0;
+                let tapTimeout = null;
+
+                const handlePlayerTap = (e) => {
+                    if (e.target.closest('button, input[type="range"]')) return;
+                    e.preventDefault();
+
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTapTime;
+                    
+                    if (tapLength < 300 && tapLength > 0) {
+                        clearTimeout(tapTimeout);
+                        lastTapTime = 0;
+
+                        const rect = playerContainer.getBoundingClientRect();
+                        const tapX = e.type.startsWith('touch') ? e.changedTouches[0].clientX : e.clientX;
+                        const isRightSide = tapX > rect.left + rect.width / 2;
+                        
+                        if (isRightSide) {
+                            video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                            animateDoubleTap('forward');
+                        } else {
+                            video.currentTime = Math.max(0, video.currentTime - 10);
+                            animateDoubleTap('rewind');
+                        }
+                        resetControlsTimeout();
+                    } else {
+                        clearTimeout(tapTimeout);
+                        if (controlsOverlay.classList.contains('opacity-0')) {
+                            // If controls are hidden, show them immediately.
+                            resetControlsTimeout();
+                        } else {
+                            // If controls are visible, we want to hide them, but must wait for a potential double tap.
+                            tapTimeout = setTimeout(() => {
+                                clearTimeout(controlsTimeout);
+                                hideControls();
+                            }, 250);
+                        }
+                    }
+                    lastTapTime = currentTime;
+                };
+
+                playerContainer.addEventListener('touchend', handlePlayerTap);
+                playerContainer.addEventListener('click', (e) => {
+                    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return; // Ignore clicks if touch is supported
+                    handlePlayerTap(e);
+                });
+
+                playPauseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    togglePlayPause();
+                };
+                centerPlayPauseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    togglePlayPause();
+                };
+                rewindBtn.onclick = (e) => { 
+                    e.stopPropagation();
+                    video.currentTime -= 10; 
+                };
+                forwardBtn.onclick = (e) => { 
+                    e.stopPropagation();
+                    video.currentTime += 10; 
+                };
+                
+                video.addEventListener('play', updatePlayButton);
+                video.addEventListener('pause', updatePlayButton);
+                video.addEventListener('volumechange', updateVolumeControls);
+                video.addEventListener('loadedmetadata', () => {
+                    updateTimeAndProgress();
+                    const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
+                    const savedTime = localStorage.getItem(storageKey);
+                    if (savedTime) {
+                        const time = parseFloat(savedTime);
+                        if (isFinite(time) && time > 0 && time < video.duration) {
+                            video.currentTime = time;
+                        }
+                    }
+                });
+
+                let lastSaveTimestamp = 0;
+                video.addEventListener('timeupdate', () => {
+                    updateTimeAndProgress();
+                    
+                    const now = Date.now();
+                    if (now - lastSaveTimestamp > 5000) {
+                        lastSaveTimestamp = now;
+                        const { currentTime, duration } = video;
+                        
+                        if (!video.paused && isFinite(duration) && currentTime > 1 && currentTime < duration - 5) {
+                           const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
+                           localStorage.setItem(storageKey, currentTime.toString());
+                        }
+                    }
+                });
+                
+                video.addEventListener('ended', () => {
+                    const storageKey = `${STORAGE_KEY_PREFIX}${video.src}`;
+                    localStorage.removeItem(storageKey);
+                });
+
+                progressBar.addEventListener('click', e => e.stopPropagation());
+                progressBar.oninput = (e) => {
+                    const newTime = e.target.value * video.duration;
+                    if (isFinite(newTime)) {
+                        video.currentTime = newTime;
+                    }
+                    const progressPercent = (e.target.value || 0) * 100;
+                    progressBar.style.setProperty('--progress-percent', `${progressPercent}%`);
+                };
+                
+                volumeBar.addEventListener('click', e => e.stopPropagation());
+                volumeBar.oninput = (e) => {
+                    video.volume = e.target.value;
+                    video.muted = e.target.value == 0;
+                    const volumePercent = e.target.value * 100;
+                    volumeBar.style.setProperty('--volume-percent', `${volumePercent}%`);
+                };
+
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleMute();
+                };
+                fullscreenBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleFullScreen();
+                };
+                downloadBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    handleDownload(e);
+                };
+                settingsBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    settingsMenu.classList.toggle('hidden');
+                    subtitlesMenu.classList.add('hidden');
+                };
+                subtitlesBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    subtitlesMenu.classList.toggle('hidden');
+                    settingsMenu.classList.add('hidden');
+                };
+
+                settingsMenu.addEventListener('click', e => e.stopPropagation());
+                subtitlesMenu.addEventListener('click', e => e.stopPropagation());
+
+                document.onfullscreenchange = updateFullscreenButton;
+
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+                if (!isTouchDevice) {
+                    playerContainer.onmousemove = resetControlsTimeout;
+                    playerContainer.onmouseleave = () => {
+                        clearTimeout(controlsTimeout);
+                        if (!video.paused) hideControls();
+                    };
+                }
+
+                subtitleUploadInput.onchange = (e) => {
+                    const file = e.target.files?.[0];
+                    if (file && (file.name.endsWith('.srt') || file.name.endsWith('.vtt'))) {
+                        const newSubtitle = {
+                            src: URL.createObjectURL(file),
+                            label: file.name.slice(0, 20),
+                            lang: 'en',
+                        };
+                        subtitles.push(newSubtitle);
+                        updateVideoTracks();
+                        renderSubtitlesMenu();
+                        if (!isEmbedMode) generateEmbedCode();
+                    } else {
+                        alert('Please upload a valid .srt or .vtt file.');
+                    }
+                };
+
+                // --- Initial Player State ---
+                if (sources.length > 0) {
+                    loadSource(sources[0].src);
+                }
+                updateVideoTracks();
+                renderSettingsMenu();
+                renderSubtitlesMenu();
+                updateVolumeControls();
+                updatePlayButton();
+            }
+            
+            // --- APP LOGIC ---
+            const generateEmbedCode = () => {
+                const embeddableSubtitles = subtitles.filter(sub => !sub.src.startsWith('blob:'));
+                if (sources.length === 0 || !sources[0].src) {
+                    embedCodeTextarea.value = '';
+                    directLinkTextarea.value = '';
+                    return;
+                }
+                const baseUrl = window.location.origin + window.location.pathname;
+                const params = new URLSearchParams();
+                params.set('embed', 'true');
+                params.set('sources', JSON.stringify(sources));
+                if (embeddableSubtitles.length > 0) {
+                    params.set('subtitles', JSON.stringify(embeddableSubtitles));
+                }
+                const embedUrl = `${baseUrl}?${params.toString()}`;
+                
+                embedCodeTextarea.value = `<iframe src="${embedUrl}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+                directLinkTextarea.value = embedUrl;
+            };
+
+            const loadPrimaryVideo = () => {
+                const url = videoUrlInput.value.trim();
+                if (url === '') {
+                    alert('Please enter a valid video URL.');
+                    return;
+                }
+                sources = [{ src: url, label: 'Default' }];
+                subtitles = [];
+                activeSubtitleSrc = '';
+
+                loadSource(url);
+                updateVideoTracks();
+                renderSettingsMenu();
+                renderSubtitlesMenu();
+                generateEmbedCode();
+            };
+
+            const setActiveTab = (tab) => {
+                const activeClasses = ['text-amber-700', 'border-amber-700', 'font-semibold'];
+                const inactiveClasses = ['text-gray-500', 'hover:text-gray-800', 'border-transparent'];
+                
+                if (tab === 'iframe') {
+                    iframeTabContent.classList.remove('hidden');
+                    directLinkTabContent.classList.add('hidden');
+                    
+                    iframeTabBtn.classList.add(...activeClasses);
+                    iframeTabBtn.classList.remove(...inactiveClasses);
+                    
+                    directLinkTabBtn.classList.add(...inactiveClasses);
+                    directLinkTabBtn.classList.remove(...activeClasses);
+                } else { // 'direct'
+                    directLinkTabContent.classList.remove('hidden');
+                    iframeTabContent.classList.add('hidden');
+
+                    directLinkTabBtn.classList.add(...activeClasses);
+                    directLinkTabBtn.classList.remove(...inactiveClasses);
+
+                    iframeTabBtn.classList.add(...inactiveClasses);
+                    iframeTabBtn.classList.remove(...activeClasses);
+                }
+            };
+            
+            // --- INITIALIZATION ---
+            function init() {
+                const params = new URLSearchParams(window.location.search);
+                isEmbedMode = params.get('embed') === 'true';
+
+                document.addEventListener('keydown', (e) => {
+                    if (!video || !isFinite(video.duration)) return;
+
+                    const activeEl = document.activeElement;
+                    const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+                    if (isTyping) return;
+
+                    switch (e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            togglePlayPause();
+                            break;
+                        case 'ArrowRight':
+                            e.preventDefault();
+                            video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                            resetControlsTimeout();
+                            break;
+                        case 'ArrowLeft':
+                            e.preventDefault();
+                            video.currentTime = Math.max(0, video.currentTime - 10);
+                            resetControlsTimeout();
+                            break;
+                        case 'KeyF':
+                             e.preventDefault();
+                             toggleFullScreen();
+                             break;
+                    }
+                });
+
+                if (isEmbedMode) {
+                    appContainer.classList.add('hidden');
+                    embedContainer.classList.remove('hidden');
+                    document.body.classList.remove('p-4', 'sm:p-8');
+                    try {
+                        const sourcesParam = params.get('sources');
+                        if (sourcesParam) sources = JSON.parse(sourcesParam);
+                        const subtitlesParam = params.get('subtitles');
+                        if (subtitlesParam) subtitles = JSON.parse(subtitlesParam);
+                    } catch (e) {
+                        console.error("Failed to parse URL params:", e);
+                        sources = [{ src: '', label: 'Error' }];
+                    }
+                    setupPlayer(embedContainer, true);
+                } else {
+                    // Attach app-mode event listeners
+                    loadVideoBtn.onclick = loadPrimaryVideo;
+                    resourceTypeSelect.onchange = (e) => {
+                        langInput.classList.toggle('hidden', e.target.value !== 'subtitle');
+                        langInput.required = e.target.value === 'subtitle';
+                    };
+                    addResourceForm.onsubmit = (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        const type = formData.get('type');
+                        const label = formData.get('label');
+                        const url = formData.get('url');
+
+                        if (type === 'resolution') {
+                            sources.push({ label, src: url });
+                            renderSettingsMenu();
+                        } else {
+                            const lang = formData.get('lang');
+                            if (!lang) {
+                                alert('Please provide a language code (e.g., "en").');
+                                return;
+                            }
+                            subtitles.push({ label, src: url, lang });
+                            updateVideoTracks();
+                            renderSubtitlesMenu();
+                        }
+                        
+                        generateEmbedCode();
+                        e.target.reset();
+                        langInput.classList.add('hidden');
+                    };
+                    copyEmbedBtn.onclick = () => {
+                        if (!embedCodeTextarea.value) {
+                            alert("Load a video first to generate an embed code.");
+                            return;
+                        }
+                        navigator.clipboard.writeText(embedCodeTextarea.value).then(() => {
+                            alert('Embed code copied to clipboard!');
+                        }, (err) => {
+                            alert('Failed to copy embed code.');
+                        });
+                    };
+                    copyDirectLinkBtn.onclick = () => {
+                        if (!directLinkTextarea.value) {
+                            alert("Load a video first to generate a direct link.");
+                            return;
+                        }
+                        navigator.clipboard.writeText(directLinkTextarea.value).then(() => {
+                            alert('Direct link copied to clipboard!');
+                        }, (err) => {
+                            alert('Failed to copy direct link.');
+                        });
+                    };
+
+                    // Tab logic
+                    iframeTabBtn.onclick = () => setActiveTab('iframe');
+                    directLinkTabBtn.onclick = () => setActiveTab('direct');
+                    setActiveTab('iframe'); // Set initial state
+
+
+                    // Set initial state for app mode
+                    sources = [];
+                    subtitles = [];
+                    setupPlayer(playerWrapper, false);
+                    generateEmbedCode();
+                }
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
